@@ -1,0 +1,57 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-tz-yellow: #f0c75f;
+  --color-tz-black: #0b0f14;
+  --color-tz-red: #ff6b6b;
+  --color-tz-green: #4fd1a1;
+  --font-display: "Space Grotesk", "IBM Plex Sans", ui-sans-serif, system-ui;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+:root {
+  color-scheme: dark;
+  --ink-950: #0b0f14;
+  --ink-900: #111622;
+  --ink-800: #1b2230;
+  --panel: #151b26;
+  --panel-2: #101521;
+  --stroke: rgba(255, 255, 255, 0.08);
+  --text: #f4f7fb;
+  --muted: rgba(244, 247, 251, 0.62);
+  --accent: #f0c75f;
+  --accent-ink: #1b1404;
+  --accent-soft: rgba(240, 199, 95, 0.18);
+  --good: #4fd1a1;
+  --danger: #ff6b6b;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 800px at 20% -10%, rgba(240, 199, 95, 0.12), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgba(79, 209, 161, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--ink-950), #0a0e15 40%, #0b1018 100%);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Prevenir auto-zoom iOS */
+input,
+select,
+textarea {
+  font-size: max(1rem, 16px);
+}
+
+#root {
+  min-height: 100dvh;
+}
