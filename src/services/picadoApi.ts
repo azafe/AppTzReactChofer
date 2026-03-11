@@ -145,7 +145,27 @@ export async function getActiveConfig(): Promise<PicadoConfig[]> {
   return raw as PicadoConfig[];
 }
 
-export async function getAnticipos(): Promise<Anticipo[]> {
-  const res = await apiGet<unknown>("/anticipos");
-  return (Array.isArray(res) ? res : []) as Anticipo[];
+export async function getAnticipos(params?: {
+  chofer?: string;
+  from?: string;
+  to?: string;
+}): Promise<Anticipo[]> {
+  const q = new URLSearchParams();
+  q.set("limit", "200");
+  q.set("sort", "fecha");
+  q.set("order", "desc");
+  if (params?.chofer) q.set("chofer", params.chofer);
+  if (params?.from) q.set("from", params.from);
+  if (params?.to) q.set("to", params.to);
+  const res = await apiGet<unknown>(`/anticipos?${q.toString()}`);
+  const r = res as Record<string, unknown>;
+  const raw = Array.isArray(res) ? res : (r?.anticipos ?? r?.data ?? []);
+  return (raw as Record<string, unknown>[]).map((a) => ({
+    id: a.id as string,
+    fecha: ((a.fecha as string) ?? "").slice(0, 10),
+    chofer: (a.chofer as string) ?? "",
+    monto: Number(a.monto ?? 0),
+    metodo: (a.metodo as "EFECTIVO" | "TRANSFERENCIA") ?? "EFECTIVO",
+    observacion: (a.observacion as string) ?? undefined,
+  }));
 }

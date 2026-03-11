@@ -25,20 +25,13 @@ export function MiPagoPage() {
 
   const anticiposQuery = useQuery({
     queryKey: ["anticipos", currentDriver?.id, { from, to }],
-    queryFn: () => getAnticipos(),
+    queryFn: () => getAnticipos({ chofer: currentDriver!.name, from, to }),
     enabled: !!currentDriver,
     staleTime: 60_000,
   });
 
   const sheets = sheetsQuery.data?.data ?? [];
-  const allAnticipos = anticiposQuery.data ?? [];
-
-  // Filter anticipos by driver and date range
-  const anticipos = allAnticipos.filter((a) => {
-    if (a.chofer !== currentDriver?.name) return false;
-    const d = a.fecha.substring(0, 10);
-    return d >= from && d <= to;
-  });
+  const anticipos = anticiposQuery.data ?? [];
 
   const totalViajes = sheets.reduce((s, sh) => s + (sh.trip_count ?? 0), 0);
   const totalBruto = sheets.reduce((s, sh) => s + (sh.total_trip_amount ?? 0), 0);

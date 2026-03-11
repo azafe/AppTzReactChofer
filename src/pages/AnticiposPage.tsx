@@ -17,18 +17,12 @@ export function AnticiposPage() {
 
   const query = useQuery({
     queryKey: ["anticipos", currentDriver?.id, { from, to }],
-    queryFn: () => getAnticipos(),
+    queryFn: () => getAnticipos({ chofer: currentDriver!.name, from, to }),
     enabled: !!currentDriver,
     staleTime: 60_000,
   });
 
-  // Filter client-side by driver name and date range
-  const all = query.data ?? [];
-  const filtered = all.filter((a) => {
-    if (a.chofer !== currentDriver?.name) return false;
-    const d = a.fecha.substring(0, 10);
-    return d >= from && d <= to;
-  });
+  const filtered = query.data ?? [];
 
   const totalMonto = filtered.reduce((s, a) => s + a.monto, 0);
 
