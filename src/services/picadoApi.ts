@@ -1,6 +1,28 @@
 import { apiGet, apiPost, apiPut } from "../lib/http";
 import type { PicadoSheet, PicadoTrip, Anticipo, PicadoSummary, PicadoConfig } from "../types/picado";
 
+function normalizeTrip(raw: Record<string, unknown>): PicadoTrip {
+  // distance puede venir en km (float) o en metros como entero (distanceInput)
+  const rawKm = raw.distance_km ?? raw.distanceKm;
+  const rawInput = raw.distanceInput;
+  let distanceKm: number | null = null;
+  if (rawKm != null) {
+    distanceKm = Number(rawKm);
+  } else if (rawInput != null) {
+    distanceKm = Number(rawInput) / 1000;
+  }
+  return {
+    id: (raw.id ?? raw._id) as string | undefined,
+    sheet_id: (raw.sheet_id ?? raw.sheetId) as string | undefined,
+    trip_number: String(raw.trip_number ?? raw.tripNumber ?? ""),
+    distance_km: distanceKm,
+    total_trip_amount: (raw.total_trip_amount ?? raw.grossTrip ?? raw.totalTripAmount ?? null) as number | null,
+    driver_amount: (raw.driver_amount ?? raw.driverPay ?? raw.driverFee ?? null) as number | null,
+    diesel_theoretical_amount: (raw.diesel_theoretical_amount ?? raw.dieselTheoretical ?? null) as number | null,
+    created_at: (raw.created_at ?? raw.createdAt ?? null) as string | null,
+  };
+}
+
 // La API devuelve campos tanto en camelCase como snake_case — normalizar todo
 function normalizeSheet(raw: Record<string, unknown>): PicadoSheet {
   const normalizeDate = (v: unknown) => {
@@ -30,7 +52,9 @@ function normalizeSheet(raw: Record<string, unknown>): PicadoSheet {
     diesel_real_value: (raw.diesel_real_value ?? null) as number | null,
     neto_tz_teorico: (raw.neto_tz_teorico ?? null) as number | null,
     neto_tz_real: (raw.neto_tz_real ?? null) as number | null,
-    trips: (raw.trips ?? null) as PicadoTrip[] | null,
+    trips: Array.isArray(raw.trips)
+      ? (raw.trips as Record<string, unknown>[]).map(normalizeTrip)
+      : null,
     created_at: (raw.created_at ?? raw.createdAt ?? null) as string | null,
     updated_at: (raw.updated_at ?? raw.updatedAt ?? null) as string | null,
   };
