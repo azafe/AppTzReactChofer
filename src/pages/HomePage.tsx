@@ -1,42 +1,43 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getSheets, getSummary } from "../services/picadoApi";
+import { getSheets } from "../services/picadoApi";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { PageSpinner, ErrorCard, EmptyState } from "../components/Spinner";
 import { moneyARS, dateAR, monthRange } from "../lib/format";
 
-function currentYearMonth() {
-  const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth() + 1 };
-}
+const MONTHS = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
 
 export function HomePage() {
   const { currentDriver } = useAuth();
-  const { year, month } = currentYearMonth();
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
   const { from, to } = monthRange(year, month);
 
-  const summaryQuery = useQuery({
-    queryKey: ["picado", "summary", currentDriver?.id, { from, to }],
-    queryFn: () => getSummary({ driverId: currentDriver!.id, from, to }),
-    enabled: !!currentDriver,
-    staleTime: 60_000,
-  });
-
+  // Traer todas las planillas del mes para calcular totales (hasta 200)
   const sheetsQuery = useQuery({
-    queryKey: ["picado", "sheets", currentDriver?.id, { from, to, limit: 5 }],
-    queryFn: () => getSheets({ driverId: currentDriver!.id, from, to, limit: 5, page: 1 }),
+    queryKey: ["picado", "sheets", currentDriver?.id, { from, to, limit: 200 }],
+    queryFn: () => getSheets({ driverId: currentDriver!.id, from, to, limit: 200 }),
     enabled: !!currentDriver,
     staleTime: 60_000,
   });
 
-  const months = [
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-  ];
+  const allSheets = sheetsQuery.data?.data ?? [];
 
-  const summary = summaryQuery.data;
-  const sheets = sheetsQuery.data?.data ?? [];
+  // Calcular totales del mes desde las planillas filtradas por este chofer
+  const totalViajes = allSheets.reduce((s, sh) => s + (sh.trip_count ?? 0), 0);
+  const totalBruto = allSheets.reduce((s, sh) => s + (sh.total_trip_amount ?? 0), 0);
+  const totalPago = allSheets.reduce((s, sh) => s + (sh.driver_amount ?? 0), 0);
+  const totalLitros = allSheets.reduce((s, sh) => s + (sh.liters_loaded ?? 0), 0);
+
+  // Últimas 5 planillas
+  const recentSheets = [...allSheets]
+    .sort((a, b) => b.sheet_date.localeCompare(a.sheet_date))
+    .slice(0, 5);
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,39 +47,26 @@ export function HomePage() {
           Hola, {currentDriver?.name?.split(" ")[0]}! 🚛
         </h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          {months[month - 1]} {year}
+          {MONTHS[month - 1]} {year}
         </p>
       </div>
 
       {/* Summary stats */}
-      {summaryQuery.isPending && <PageSpinner />}
-      {summaryQuery.isError && (
+      {sheetsQuery.isPending && <PageSpinner />}
+      {sheetsQuery.isError && (
         <ErrorCard
           message="No se pudo cargar el resumen"
-          onRetry={() => summaryQuery.refetch()}
+          onRetry={() => sheetsQuery.refetch()}
         />
       )}
-      {summary && (
+      {!sheetsQuery.isPending && !sheetsQuery.isError && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard
-            label="Viajes"
-            value={summary.total_trips ?? 0}
-            sub="este mes"
-          />
-          <StatCard
-            label="Ingreso bruto"
-            value={moneyARS(summary.total_trip_amount)}
-            sub="este mes"
-          />
-          <StatCard
-            label="Tu pago"
-            value={moneyARS(summary.driver_amount)}
-            sub="estimado"
-            accent
-          />
+          <StatCard label="Viajes" value={totalViajes} sub="este mes" />
+          <StatCard label="Ingreso bruto" value={moneyARS(totalBruto)} sub="este mes" />
+          <StatCard label="Tu pago" value={moneyARS(totalPago)} sub="estimado" accent />
           <StatCard
             label="Litros"
-            value={`${(summary.liters_loaded ?? 0).toLocaleString("es-AR")} L`}
+            value={`${totalLitros.toLocaleString("es-AR")} L`}
             sub="cargados"
           />
         </div>
@@ -102,19 +90,12 @@ export function HomePage() {
           </Link>
         </div>
 
-        {sheetsQuery.isPending && <PageSpinner />}
-        {sheetsQuery.isError && (
-          <ErrorCard
-            message="No se pudieron cargar las planillas"
-            onRetry={() => sheetsQuery.refetch()}
-          />
-        )}
-        {!sheetsQuery.isPending && sheets.length === 0 && (
+        {!sheetsQuery.isPending && allSheets.length === 0 && (
           <EmptyState message="No tenés viajes este mes" />
         )}
 
         <div className="flex flex-col gap-3">
-          {sheets.map((sheet) => (
+          {recentSheets.map((sheet) => (
             <Card key={sheet.id}>
               <div className="flex items-start justify-between">
                 <div>
