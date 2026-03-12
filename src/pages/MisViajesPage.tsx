@@ -38,7 +38,6 @@ export function MisViajesPage() {
 
   const totalViajes = sheets.reduce((s, sh) => s + (sh.trip_count ?? 0), 0);
   const totalPago = sheets.reduce((s, sh) => s + (sh.driver_amount ?? 0), 0);
-  const totalLitros = sheets.reduce((s, sh) => s + (sh.liters_loaded ?? 0), 0);
 
   function toggleExpand(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -61,10 +60,9 @@ export function MisViajesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <StatCard label="Viajes" value={totalViajes} />
         <StatCard label="Tu pago" value={moneyARS(totalPago)} accent />
-        <StatCard label="Litros" value={`${totalLitros.toLocaleString("es-AR")} L`} />
       </div>
 
       {sheetsQuery.isPending && <PageSpinner />}
@@ -106,9 +104,6 @@ export function MisViajesPage() {
                     )}
                     <div className="mt-2 flex gap-3 text-xs text-[var(--muted)]">
                       <span>{sheet.trip_count ?? 0} viajes</span>
-                      {sheet.liters_loaded != null && (
-                        <span>{sheet.liters_loaded} L</span>
-                      )}
                       <span className="text-[var(--text)]">
                         Bruto: {moneyARS(sheet.total_trip_amount)}
                       </span>
