@@ -1,9 +1,7 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
 
 const items = [
-  { to: "/", label: "Inicio", icon: "🏠" },
   { to: "/mis-viajes", label: "Mis Viajes", icon: "📋" },
   { to: "/cargar", label: "Cargar Viaje", icon: "➕" },
   { to: "/anticipos", label: "Anticipos", icon: "💰" },
@@ -44,7 +42,6 @@ export function SideNav() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === "/"}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive

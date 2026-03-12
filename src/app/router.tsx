@@ -1,7 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { Layout } from "./Layout";
 import { LoginPage } from "../pages/LoginPage";
-import { HomePage } from "../pages/HomePage";
 import { MisViajesPage } from "../pages/MisViajesPage";
 import { CargarViajePage } from "../pages/CargarViajePage";
 import { AnticiposPage } from "../pages/AnticiposPage";
@@ -21,7 +20,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <HomePage /> },
+      { index: true, element: <Navigate to="/mis-viajes" replace /> },
       { path: "mis-viajes", element: <MisViajesPage /> },
       { path: "cargar", element: <CargarViajePage /> },
       { path: "anticipos", element: <AnticiposPage /> },
@@ -30,6 +29,6 @@ export const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/" replace />,
+    element: <Navigate to="/mis-viajes" replace />,
   },
 ]);
