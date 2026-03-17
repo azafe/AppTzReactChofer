@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const driver: DriverAccount = {
         id: c.id,
         driverId: c.driverId ?? c.driver_id ?? "",
-        name: c.nombreCompleto ?? `${c.nombre ?? ""} ${c.apellido ?? ""}`.trim(),
+        name: c.nombre ?? c.nombreCompleto ?? "",
         username: c.username ?? username.trim().toLowerCase(),
         vehicleLabel: c.vehicleLabel ?? undefined,
         vehicleId: c.vehicleId ?? undefined,
