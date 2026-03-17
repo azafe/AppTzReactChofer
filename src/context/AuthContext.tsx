@@ -1,44 +1,64 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import type { DriverAccount } from "../types/auth";
-import { DRIVER_ACCOUNTS } from "../config/drivers";
 
 type AuthContextValue = {
   currentDriver: DriverAccount | null;
-  login: (username: string, pin: string) => boolean;
+  login: (username: string, pin: string) => Promise<boolean>;
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEY = "tz_chofer_driver_id";
+const STORAGE_KEY = "tz_chofer_session";
+const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentDriver, setCurrentDriver] = useState<DriverAccount | null>(() => {
+function loadSession(): DriverAccount | null {
+  try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return null;
-    return DRIVER_ACCOUNTS.find((d) => d.id === saved) ?? null;
-  });
+    return JSON.parse(saved) as DriverAccount;
+  } catch {
+    return null;
+  }
+}
 
-  useEffect(() => {
-    if (currentDriver) {
-      localStorage.setItem(STORAGE_KEY, currentDriver.id);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [currentDriver]);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [currentDriver, setCurrentDriver] = useState<DriverAccount | null>(loadSession);
 
-  function login(username: string, pin: string): boolean {
-    const driver = DRIVER_ACCOUNTS.find(
-      (d) => d.username === username.trim().toLowerCase() && d.pin === pin.trim()
-    );
-    if (driver) {
+  async function login(username: string, pin: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/choferes/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
+      });
+
+      if (!res.ok) return false;
+
+      const data = await res.json();
+      if (!data.ok || !data.chofer) return false;
+
+      const c = data.chofer;
+      const driver: DriverAccount = {
+        id: c.id,
+        driverId: c.driverId ?? c.driver_id ?? "",
+        name: c.nombreCompleto ?? `${c.nombre ?? ""} ${c.apellido ?? ""}`.trim(),
+        username: c.username ?? username.trim().toLowerCase(),
+        vehicleLabel: c.vehicleLabel ?? undefined,
+        vehicleId: c.vehicleId ?? undefined,
+        modulos: Array.isArray(c.modulos) ? c.modulos : [],
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(driver));
       setCurrentDriver(driver);
       return true;
+    } catch {
+      return false;
     }
-    return false;
   }
 
   function logout() {
+    localStorage.removeItem(STORAGE_KEY);
     setCurrentDriver(null);
   }
 

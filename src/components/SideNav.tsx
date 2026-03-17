@@ -1,16 +1,32 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const items = [
-  { to: "/mis-viajes", label: "Mis Viajes", icon: "📋" },
-  { to: "/cargar", label: "Cargar Viaje", icon: "➕" },
+type NavItem = { to: string; label: string; icon: string };
+
+const ALWAYS_VISIBLE: NavItem[] = [
   { to: "/anticipos", label: "Anticipos", icon: "💰" },
   { to: "/mi-pago", label: "Mi Pago", icon: "📊" },
+];
+
+const PICADO_ITEMS: NavItem[] = [
+  { to: "/mis-viajes", label: "Mis Viajes", icon: "📋" },
+  { to: "/cargar", label: "Cargar Viaje", icon: "➕" },
+];
+
+const ZAFRA_ITEMS: NavItem[] = [
+  { to: "/zafra/mis-viajes", label: "Zafra", icon: "🚜" },
 ];
 
 export function SideNav() {
   const { currentDriver, logout } = useAuth();
   const navigate = useNavigate();
+  const modulos = currentDriver?.modulos ?? [];
+
+  const items: NavItem[] = [
+    ...(modulos.includes("PICADO") ? PICADO_ITEMS : []),
+    ...(modulos.includes("ZAFRA") ? ZAFRA_ITEMS : []),
+    ...ALWAYS_VISIBLE,
+  ];
 
   function handleLogout() {
     logout();

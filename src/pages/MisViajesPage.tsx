@@ -19,9 +19,9 @@ export function MisViajesPage() {
   const { from, to } = monthRange(year, month);
 
   const sheetsQuery = useQuery({
-    queryKey: ["picado", "sheets", currentDriver?.id, { from, to, page, limit: LIMIT }],
+    queryKey: ["picado", "sheets", currentDriver?.driverId, { from, to, page, limit: LIMIT }],
     queryFn: () =>
-      getSheets({ driverId: currentDriver!.id, from, to, page, limit: LIMIT }),
+      getSheets({ driverId: currentDriver!.driverId, from, to, page, limit: LIMIT }),
     enabled: !!currentDriver,
     staleTime: 60_000,
   });

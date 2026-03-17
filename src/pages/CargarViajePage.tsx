@@ -86,7 +86,7 @@ export function CargarViajePage() {
       const sheetPayload = {
         sheet_date: normalizeISODate(sheetDate),
         sheet_number: sheetNumber || null,
-        driver_id: currentDriver!.id,
+        driver_id: currentDriver!.driverId,
         driver_name: currentDriver!.name,
         vehicle_id: currentDriver!.vehicleId ?? null,
         vehicle_label: currentDriver!.vehicleLabel ?? null,
@@ -109,7 +109,7 @@ export function CargarViajePage() {
         // Conflict: merge into existing sheet
         if (e.status === 400 || e.status === 409) {
           const existing = await getSheets({
-            driverId: currentDriver!.id,
+            driverId: currentDriver!.driverId,
             from: normalizeISODate(sheetDate),
             to: normalizeISODate(sheetDate),
             limit: 10,

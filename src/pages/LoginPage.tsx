@@ -19,8 +19,7 @@ export function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 300));
-    const ok = login(username, pin);
+    const ok = await login(username, pin);
     setLoading(false);
     if (ok) {
       navigate("/", { replace: true });
