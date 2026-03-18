@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { getSheet, getSheets } from "../services/picadoApi";
+import { PicadoNav } from "../components/PicadoNav";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard, EmptyState } from "../components/Spinner";
@@ -45,6 +46,8 @@ export function MisViajesPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PicadoNav />
+
       <div className="flex items-center justify-between">
         <SectionTitle>Mis Viajes</SectionTitle>
         <MonthPicker

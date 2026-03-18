@@ -1,11 +1,11 @@
 import { NavLink } from "react-router-dom";
 
 const tabs = [
-  { to: "/zafra/nuevo", label: "Nuevo Viaje" },
-  { to: "/zafra/mis-viajes", label: "Mis Viajes" },
+  { to: "/picado/nuevo", label: "Nuevo Viaje" },
+  { to: "/picado/mis-viajes", label: "Mis Viajes" },
 ];
 
-export function ZafraNav() {
+export function PicadoNav() {
   return (
     <div className="flex gap-2 rounded-2xl border border-white/8 bg-white/3 p-1">
       {tabs.map((tab) => (

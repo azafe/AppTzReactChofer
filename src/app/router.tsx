@@ -22,18 +22,25 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/mis-viajes" replace /> },
-      { path: "mis-viajes", element: <MisViajesPage /> },
-      { path: "cargar", element: <CargarViajePage /> },
+      { index: true, element: <Navigate to="/picado/nuevo" replace /> },
+      // Picado
+      { path: "picado", element: <Navigate to="/picado/nuevo" replace /> },
+      { path: "picado/nuevo", element: <CargarViajePage /> },
+      { path: "picado/mis-viajes", element: <MisViajesPage /> },
+      // Rutas viejas → redirigen al nuevo esquema
+      { path: "mis-viajes", element: <Navigate to="/picado/mis-viajes" replace /> },
+      { path: "cargar", element: <Navigate to="/picado/nuevo" replace /> },
+      // Zafra
+      { path: "zafra", element: <Navigate to="/zafra/nuevo" replace /> },
+      { path: "zafra/nuevo", element: <ZafraCargarPage /> },
+      { path: "zafra/mis-viajes", element: <ZafraMisViajesPage /> },
+      // Siempre visible
       { path: "anticipos", element: <AnticiposPage /> },
       { path: "mi-pago", element: <MiPagoPage /> },
-      { path: "zafra", element: <Navigate to="/zafra/mis-viajes" replace /> },
-      { path: "zafra/mis-viajes", element: <ZafraMisViajesPage /> },
-      { path: "zafra/nuevo", element: <ZafraCargarPage /> },
     ],
   },
   {
     path: "*",
-    element: <Navigate to="/mis-viajes" replace />,
+    element: <Navigate to="/picado/nuevo" replace />,
   },
 ]);

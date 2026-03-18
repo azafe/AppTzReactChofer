@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { createSheet, updateSheet, getSheets, addSheetTrips, replaceSheetTrips } from "../services/picadoApi";
 import { TripFormRow, type TripRowData } from "../components/TripFormRow";
-import { Card, SectionTitle } from "../components/Card";
+import { PicadoNav } from "../components/PicadoNav";
+import { Card } from "../components/Card";
 import { showToast } from "../components/Toast";
 import { moneyARS, todayISO, normalizeISODate } from "../lib/format";
 import { calcPlanilla } from "../lib/picadoCalc";
@@ -168,7 +169,7 @@ export function CargarViajePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionTitle>Cargar Viaje</SectionTitle>
+      <PicadoNav />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {/* Fecha y planilla */}

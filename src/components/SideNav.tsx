@@ -1,30 +1,41 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-type NavItem = { to: string; label: string; icon: string };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: string;
+  activePrefix?: string;
+};
 
 const ALWAYS_VISIBLE: NavItem[] = [
   { to: "/anticipos", label: "Anticipos", icon: "💰" },
   { to: "/mi-pago", label: "Mi Pago", icon: "📊" },
 ];
 
-const PICADO_ITEMS: NavItem[] = [
-  { to: "/mis-viajes", label: "Mis Viajes", icon: "📋" },
-  { to: "/cargar", label: "Cargar Viaje", icon: "➕" },
-];
+const PICADO_ITEM: NavItem = {
+  to: "/picado/nuevo",
+  label: "Picado",
+  icon: "📋",
+  activePrefix: "/picado",
+};
 
-const ZAFRA_ITEMS: NavItem[] = [
-  { to: "/zafra/mis-viajes", label: "Zafra", icon: "🚜" },
-];
+const ZAFRA_ITEM: NavItem = {
+  to: "/zafra/nuevo",
+  label: "Zafra",
+  icon: "🚜",
+  activePrefix: "/zafra",
+};
 
 export function SideNav() {
   const { currentDriver, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const modulos = currentDriver?.modulos ?? [];
 
   const items: NavItem[] = [
-    ...(modulos.includes("PICADO") ? PICADO_ITEMS : []),
-    ...(modulos.includes("ZAFRA") ? ZAFRA_ITEMS : []),
+    ...(modulos.includes("PICADO") ? [PICADO_ITEM] : []),
+    ...(modulos.includes("ZAFRA") ? [ZAFRA_ITEM] : []),
     ...ALWAYS_VISIBLE,
   ];
 
@@ -54,22 +65,25 @@ export function SideNav() {
       </div>
 
       <nav className="flex flex-col gap-1 flex-1">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+        {items.map((item) => {
+          const isActive = item.activePrefix
+            ? location.pathname.startsWith(item.activePrefix)
+            : location.pathname === item.to;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
                   ? "bg-tz-yellow text-tz-black"
                   : "text-[var(--muted)] hover:bg-white/5 hover:text-[var(--text)]"
-              }`
-            }
-          >
-            <span>{item.icon}</span>
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+              }`}
+            >
+              <span>{item.icon}</span>
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
 
       <button
