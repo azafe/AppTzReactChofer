@@ -16,7 +16,7 @@ const ALWAYS_VISIBLE: NavItem[] = [
 const PICADO_ITEM: NavItem = {
   to: "/picado/nuevo",
   label: "Picado",
-  icon: "📋",
+  icon: "🌽",
   activePrefix: "/picado",
 };
 
