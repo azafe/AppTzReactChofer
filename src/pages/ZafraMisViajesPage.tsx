@@ -90,7 +90,9 @@ export function ZafraMisViajesPage() {
                     <p className="font-display text-xl font-bold text-tz-yellow">
                       {moneyARS(v.comisionChofer)}
                     </p>
-                    <p className="text-xs text-[var(--muted)]">comisión</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {v.modalidad === "AMARILLOS" ? "pago viaje" : "comisión"}
+                    </p>
                   </>
                 ) : (
                   <p className="text-sm text-[var(--muted)]">—</p>

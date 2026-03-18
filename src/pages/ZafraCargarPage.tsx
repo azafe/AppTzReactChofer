@@ -202,6 +202,9 @@ export function ZafraCargarPage() {
               comisionPctSnapshot: resolvedConfig.porcentajeComision,
             }
           : {}),
+        ...(modalidad === "AMARILLOS"
+          ? { comisionChofer: config.amarillos.tarifaPorViajeConductor }
+          : {}),
       };
 
       return createZafraViaje(body);
