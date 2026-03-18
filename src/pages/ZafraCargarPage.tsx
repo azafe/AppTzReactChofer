@@ -185,7 +185,7 @@ export function ZafraCargarPage() {
         fecha,
         choferId: currentDriver!.id,
         choferNombre: currentDriver!.name,
-        camionId: camionVehicleId || currentDriver!.vehicleId ?? "",
+        camionId: camionVehicleId || (currentDriver!.vehicleId ?? ""),
         camionNombre,
         lugarId: lugarId || null,
         lugarNombre: lugarNombre || null,
