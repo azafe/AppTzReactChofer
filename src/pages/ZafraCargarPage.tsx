@@ -70,7 +70,6 @@ export function ZafraCargarPage() {
   const [kmLlegada, setKmLlegada] = useState("");
   const [gasoil, setGasoil] = useState("");
   const [pesoNetoKg, setPesoNetoKg] = useState("");
-  const [montoChoferAmarillos, setMontoChoferAmarillos] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
   const [fotoGasoilUrl, setFotoGasoilUrl] = useState<string | null>(null);
@@ -129,14 +128,6 @@ export function ZafraCargarPage() {
   const config = configQ.data?.config ?? DEFAULT_CONFIG;
   const unidades = unidadesQ.data?.unidades ?? [];
   const resolvedConfig = config.particulares;
-
-  // Pre-fill monto chofer Amarillos when config loads
-  const tarifaPorViaje = config.amarillos.tarifaPorViajeConductor;
-  useMemo(() => {
-    if (modalidad === "AMARILLOS" && !montoChoferAmarillos) {
-      setMontoChoferAmarillos(String(tarifaPorViaje));
-    }
-  }, [modalidad, tarifaPorViaje]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kmSalidaN = asNum(kmSalida);
   const kmLlegadaN = asNum(kmLlegada);
@@ -211,9 +202,6 @@ export function ZafraCargarPage() {
               comisionPctSnapshot: resolvedConfig.porcentajeComision,
             }
           : {}),
-        ...(modalidad === "AMARILLOS"
-          ? { comisionChofer: asNum(montoChoferAmarillos) || null }
-          : {}),
       };
 
       return createZafraViaje(body);
@@ -228,7 +216,6 @@ export function ZafraCargarPage() {
       setObservaciones("");
       setFotoRemitoUrl(null);
       setFotoGasoilUrl(null);
-      setMontoChoferAmarillos(String(config.amarillos.tarifaPorViajeConductor));
       setErrors([]);
       queryClient.invalidateQueries({ queryKey: ["zafra"] });
       queryClient.invalidateQueries({ queryKey: ["zafra-last-viaje"] });
@@ -400,20 +387,6 @@ export function ZafraCargarPage() {
                 />
               </div>
             )}
-            {modalidad === "AMARILLOS" && (
-              <div>
-                <label className={labelCls}>Monto chofer (ARS)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={montoChoferAmarillos}
-                  onChange={(e) => setMontoChoferAmarillos(e.target.value)}
-                  placeholder="0"
-                  className={inputCls}
-                />
-              </div>
-            )}
           </div>
           {kmRecorridos > 0 && (
             <p className="mt-2 text-xs text-[var(--muted)]">
@@ -423,7 +396,7 @@ export function ZafraCargarPage() {
           )}
         </Card>
 
-        {/* Comisión en tiempo real */}
+        {/* Comisión en tiempo real — solo para PARTICULARES */}
         {modalidad === "PARTICULARES" && calcs && (
           <Card className="border-tz-yellow/20 bg-[rgba(240,199,95,0.04)]">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-tz-yellow">
@@ -431,16 +404,6 @@ export function ZafraCargarPage() {
             </p>
             <p className="font-display text-3xl font-bold text-tz-yellow">
               {moneyARS(calcs.comisionChofer)}
-            </p>
-          </Card>
-        )}
-        {modalidad === "AMARILLOS" && asNum(montoChoferAmarillos) > 0 && (
-          <Card className="border-tz-yellow/20 bg-[rgba(240,199,95,0.04)]">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-tz-yellow">
-              Tu pago por este viaje
-            </p>
-            <p className="font-display text-3xl font-bold text-tz-yellow">
-              {moneyARS(asNum(montoChoferAmarillos))}
             </p>
           </Card>
         )}
