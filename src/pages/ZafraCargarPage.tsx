@@ -29,7 +29,6 @@ const DEFAULT_CONFIG: ZafraConfig = {
     tarifaDiariaConductor: 56000,
     tarifaPorViajeConductor: 12000,
   },
-  camionOverrides: {},
 };
 
 function asNum(v: string) {
@@ -37,11 +36,6 @@ function asNum(v: string) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-function resolveConfig(camionId: string, config: ZafraConfig) {
-  const override = config.camionOverrides?.[camionId];
-  if (!override) return config.particulares;
-  return { ...config.particulares, ...override };
-}
 
 function calcParticulares(params: {
   kmIngenioFinca: number;
@@ -133,7 +127,7 @@ export function ZafraCargarPage() {
 
   const config = configQ.data?.config ?? DEFAULT_CONFIG;
   const unidades = unidadesQ.data?.unidades ?? [];
-  const resolvedConfig = resolveConfig(camionVehicleId, config);
+  const resolvedConfig = config.particulares;
 
   const kmSalidaN = asNum(kmSalida);
   const kmLlegadaN = asNum(kmLlegada);

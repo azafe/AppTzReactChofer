@@ -51,7 +51,6 @@ export type ZafraConfig = {
     tarifaDiariaConductor: number;
     tarifaPorViajeConductor: number;
   };
-  camionOverrides: Record<string, Partial<ZafraConfig["particulares"]>>;
 };
 
 export type ZafraViajeBody = {
