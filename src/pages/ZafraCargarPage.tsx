@@ -1,4 +1,4 @@
-import { useState, useMemo, type FormEvent } from "react";
+import { useState, useMemo, useRef, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -6,6 +6,8 @@ import {
   getLugares,
   getFrentes,
   getZafraConfig,
+  getUnidadesActivas,
+  uploadZafraFoto,
   listMisViajes,
   type ZafraModalidad,
   type ZafraConfig,
@@ -67,6 +69,7 @@ export function ZafraCargarPage() {
 
   const [modalidad, setModalidad] = useState<ZafraModalidad>("PARTICULARES");
   const [fecha, setFecha] = useState(todayISO());
+  const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [lugarId, setLugarId] = useState("");
   const [frenteId, setFrenteId] = useState("");
   const [kmSalida, setKmSalida] = useState("");
@@ -74,12 +77,24 @@ export function ZafraCargarPage() {
   const [gasoil, setGasoil] = useState("");
   const [pesoNetoKg, setPesoNetoKg] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
+  const [fotoGasoilUrl, setFotoGasoilUrl] = useState<string | null>(null);
+  const [uploadingRemito, setUploadingRemito] = useState(false);
+  const [uploadingGasoil, setUploadingGasoil] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+
+  const remitoInputRef = useRef<HTMLInputElement>(null);
+  const gasoilInputRef = useRef<HTMLInputElement>(null);
 
   const configQ = useQuery({
     queryKey: ["zafra-config"],
     queryFn: getZafraConfig,
     staleTime: 60_000,
+  });
+  const unidadesQ = useQuery({
+    queryKey: ["zafra-unidades"],
+    queryFn: getUnidadesActivas,
+    staleTime: 120_000,
   });
   const lugaresQ = useQuery({
     queryKey: ["zafra-lugares"],
@@ -117,8 +132,8 @@ export function ZafraCargarPage() {
   });
 
   const config = configQ.data?.config ?? DEFAULT_CONFIG;
-  const camionId = currentDriver?.vehicleId ?? "";
-  const resolvedConfig = resolveConfig(camionId, config);
+  const unidades = unidadesQ.data?.unidades ?? [];
+  const resolvedConfig = resolveConfig(camionVehicleId, config);
 
   const kmSalidaN = asNum(kmSalida);
   const kmLlegadaN = asNum(kmLlegada);
@@ -160,13 +175,18 @@ export function ZafraCargarPage() {
       if (!Number.isFinite(gasoilN) || gasoilN < 0) errs.push("Gasoil debe ser >= 0.");
       if (errs.length) throw Object.assign(new Error("validation"), { validationErrors: errs });
 
+      const camionNombre =
+        unidades.find((u) => u.vehicleId === camionVehicleId)?.vehicleLabel ??
+        currentDriver!.vehicleLabel ??
+        "";
+
       const body = {
         modalidad,
         fecha,
         choferId: currentDriver!.id,
         choferNombre: currentDriver!.name,
-        camionId: currentDriver!.vehicleId ?? "",
-        camionNombre: currentDriver!.vehicleLabel ?? "",
+        camionId: camionVehicleId || currentDriver!.vehicleId ?? "",
+        camionNombre,
         lugarId: lugarId || null,
         lugarNombre: lugarNombre || null,
         frenteId: frenteId || null,
@@ -176,6 +196,8 @@ export function ZafraCargarPage() {
         gasoil: gasoilN,
         pesoNetoKg: modalidad === "PARTICULARES" ? pesoN : null,
         observaciones: observaciones.trim() || null,
+        fotoRemitoUrl: fotoRemitoUrl || null,
+        fotoGasoilUrl: fotoGasoilUrl || null,
         ...(calcs
           ? {
               valorUnitarioARS: calcs.valorUnitario,
@@ -198,6 +220,8 @@ export function ZafraCargarPage() {
       setGasoil("");
       setPesoNetoKg("");
       setObservaciones("");
+      setFotoRemitoUrl(null);
+      setFotoGasoilUrl(null);
       setErrors([]);
       queryClient.invalidateQueries({ queryKey: ["zafra"] });
       queryClient.invalidateQueries({ queryKey: ["zafra-last-viaje"] });
@@ -251,7 +275,7 @@ export function ZafraCargarPage() {
             </div>
           </div>
 
-          {/* Chofer y camión — read-only */}
+          {/* Chofer y camión */}
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Chofer</label>
@@ -259,7 +283,21 @@ export function ZafraCargarPage() {
             </div>
             <div>
               <label className={labelCls}>Camión</label>
-              <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
+              {unidades.length > 0 ? (
+                <select
+                  value={camionVehicleId}
+                  onChange={(e) => setCamionVehicleId(e.target.value)}
+                  className={inputCls}
+                >
+                  {unidades.map((u) => (
+                    <option key={u.vehicleId} value={u.vehicleId}>
+                      {u.vehicleLabel}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
+              )}
             </div>
           </div>
         </Card>
@@ -375,6 +413,100 @@ export function ZafraCargarPage() {
             </p>
           </Card>
         )}
+
+        {/* Documentación */}
+        <Card>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Documentación
+          </p>
+          <div className="flex flex-col gap-3">
+            {/* Foto Remito */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <p className="text-sm text-[var(--text)]">Foto de Remito <span className="text-xs text-[var(--muted)]">(opcional)</span></p>
+              </div>
+              <input
+                ref={remitoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingRemito(true);
+                  try {
+                    const res = await uploadZafraFoto(file, "remito");
+                    setFotoRemitoUrl(res.url);
+                  } catch {
+                    showToast("Error al subir foto de remito", "error");
+                  } finally {
+                    setUploadingRemito(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+              {fotoRemitoUrl && (
+                <img
+                  src={fotoRemitoUrl}
+                  alt="Remito"
+                  className="h-10 w-10 rounded-lg object-cover border border-white/15"
+                />
+              )}
+              <button
+                type="button"
+                disabled={uploadingRemito}
+                onClick={() => remitoInputRef.current?.click()}
+                className="h-9 rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition-all"
+              >
+                {uploadingRemito ? "Subiendo..." : fotoRemitoUrl ? "Cambiar" : "📷 Subir"}
+              </button>
+            </div>
+
+            {/* Foto Gasoil */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <p className="text-sm text-[var(--text)]">Foto de Gasoil <span className="text-xs text-[var(--muted)]">(opcional)</span></p>
+              </div>
+              <input
+                ref={gasoilInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingGasoil(true);
+                  try {
+                    const res = await uploadZafraFoto(file, "gasoil");
+                    setFotoGasoilUrl(res.url);
+                  } catch {
+                    showToast("Error al subir foto de gasoil", "error");
+                  } finally {
+                    setUploadingGasoil(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+              {fotoGasoilUrl && (
+                <img
+                  src={fotoGasoilUrl}
+                  alt="Gasoil"
+                  className="h-10 w-10 rounded-lg object-cover border border-white/15"
+                />
+              )}
+              <button
+                type="button"
+                disabled={uploadingGasoil}
+                onClick={() => gasoilInputRef.current?.click()}
+                className="h-9 rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition-all"
+              >
+                {uploadingGasoil ? "Subiendo..." : fotoGasoilUrl ? "Cambiar" : "📷 Subir"}
+              </button>
+            </div>
+          </div>
+        </Card>
 
         {/* Observaciones */}
         <Card>

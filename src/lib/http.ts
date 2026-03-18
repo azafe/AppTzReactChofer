@@ -49,3 +49,32 @@ export function apiPut<T>(path: string, body: unknown): Promise<T> {
 export function apiDelete<T>(path: string): Promise<T> {
   return request<T>("DELETE", path);
 }
+
+export async function apiPostForm<T>(path: string, formData: FormData): Promise<T> {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "x-api-key": API_KEY,
+      // No Content-Type — browser sets it with boundary automatically
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const json = await res.json();
+      message = json.message ?? json.error ?? message;
+    } catch {
+      // ignore parse error
+    }
+    const err = new Error(message) as Error & { status: number };
+    err.status = res.status;
+    throw err;
+  }
+
+  const text = await res.text();
+  if (!text) return undefined as unknown as T;
+  return JSON.parse(text) as T;
+}

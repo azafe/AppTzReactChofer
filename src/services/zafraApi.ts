@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "../lib/http";
+import { apiGet, apiPost, apiPostForm, apiPut } from "../lib/http";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +23,8 @@ export type ZafraViaje = {
   gasoil: number;
   pesoNetoKg?: number | null;
   observaciones?: string | null;
+  fotoRemitoUrl?: string | null;
+  fotoGasoilUrl?: string | null;
   valorUnitarioARS?: number | null;
   valorTotalARS?: number | null;
   comisionChofer?: number | null;
@@ -35,6 +37,7 @@ export type ZafraViaje = {
 
 export type ZafraLugar = { id: string; nombre: string };
 export type ZafraFrente = { id: string; numero: string; nombre?: string | null };
+export type ZafraCamion = { vehicleId: string; vehicleLabel: string };
 
 export type ZafraConfig = {
   particulares: {
@@ -67,6 +70,8 @@ export type ZafraViajeBody = {
   gasoil: number;
   pesoNetoKg?: number | null;
   observaciones?: string | null;
+  fotoRemitoUrl?: string | null;
+  fotoGasoilUrl?: string | null;
   valorUnitarioARS?: number | null;
   valorTotalARS?: number | null;
   comisionChofer?: number | null;
@@ -114,4 +119,18 @@ export async function getFrentes(): Promise<{ ok: boolean; frentes: ZafraFrente[
 
 export async function getZafraConfig(): Promise<{ ok: boolean; config: ZafraConfig | null }> {
   return apiGet("/registro-viajes/config");
+}
+
+export async function getUnidadesActivas(): Promise<{ ok: boolean; unidades: ZafraCamion[] }> {
+  return apiGet("/unidades?estado=ACTIVA&tipo=CAMION&limit=200");
+}
+
+export async function uploadZafraFoto(
+  file: File,
+  tipo: "remito" | "gasoil"
+): Promise<{ ok: boolean; url: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("tipo", tipo);
+  return apiPostForm("/registro-viajes/upload-foto", fd);
 }
