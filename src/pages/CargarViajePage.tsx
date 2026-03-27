@@ -118,12 +118,7 @@ export function CargarViajePage() {
             to: normalizeISODate(sheetDate),
             limit: 10,
           });
-          const match = existing.data?.find(
-            (s) =>
-              normalizeISODate(s.sheet_date) === normalizeISODate(sheetDate) &&
-              (s.vehicle_id === currentDriver!.vehicleId ||
-                s.vehicle_label === currentDriver!.vehicleLabel)
-          );
+          const match = existing.data?.[0];
           if (match) {
             await updateSheet(match.id, {
               ...sheetPayload,
