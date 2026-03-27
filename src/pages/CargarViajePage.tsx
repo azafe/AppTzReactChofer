@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
-import { createSheet, updateSheet, getSheets, addSheetTrips, replaceSheetTrips } from "../services/picadoApi";
+import { createSheet, replaceSheetTrips } from "../services/picadoApi";
 import { TripFormRow, type TripRowData } from "../components/TripFormRow";
 import { PicadoNav } from "../components/PicadoNav";
 import { Card } from "../components/Card";
@@ -100,38 +100,9 @@ export function CargarViajePage() {
         diesel_theoretical_amount: calc?.totalDieselTheoretical ?? 0,
       };
 
-      console.log("[CargarViaje] sheetPayload:", sheetPayload);
-      console.log("[CargarViaje] tripPayload:", tripPayload);
-      try {
-        // Try create
-        const sheet = await createSheet(sheetPayload);
-        await replaceSheetTrips(sheet.id, tripPayload);
-        return { mode: "created" };
-      } catch (err: unknown) {
-        const e = err as Error & { status?: number };
-        console.error("[CargarViaje] createSheet error:", e.status, e.message, e);
-        // Conflict: merge into existing sheet
-        if (e.status === 400 || e.status === 409) {
-          const existing = await getSheets({
-            driverId: currentDriver!.driverId,
-            from: normalizeISODate(sheetDate),
-            to: normalizeISODate(sheetDate),
-            limit: 10,
-          });
-          const match = existing.data?.[0];
-          if (match) {
-            await updateSheet(match.id, {
-              ...sheetPayload,
-              trip_count: (match.trip_count ?? 0) + validRows.length,
-              total_trip_amount: (match.total_trip_amount ?? 0) + (calc?.totalTripAmount ?? 0),
-              driver_amount: (match.driver_amount ?? 0) + (calc?.totalDriverAmount ?? 0),
-            });
-            await addSheetTrips(match.id, tripPayload);
-            return { mode: "merged" };
-          }
-        }
-        throw err;
-      }
+      const sheet = await createSheet(sheetPayload);
+      await replaceSheetTrips(sheet.id, tripPayload);
+      return { mode: "created" };
     },
     onSuccess: (result) => {
       if (result.mode === "merged") {
