@@ -33,7 +33,7 @@ function normalizeSheet(raw: Record<string, unknown>): PicadoSheet {
     (raw.vehicle_label ?? raw.vehicleLabel ?? raw.license_plate ?? raw.licensePlate ?? raw.vehicle_id ?? raw.vehicleId ?? null) as string | null;
   return {
     id: raw.id as string,
-    sheet_date: normalizeDate(raw.sheet_date ?? raw.sheetDate),
+    sheet_date: normalizeDate(raw.sheet_date ?? raw.sheetDate ?? raw.date),
     sheet_number: (raw.sheet_number ?? raw.sheetNumber ?? null) as string | null,
     driver_id: (raw.driver_id ?? raw.driverId ?? null) as string | null,
     driver_name: (raw.driver_name ?? raw.driverName ?? null) as string | null,
