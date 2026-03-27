@@ -100,6 +100,8 @@ export function CargarViajePage() {
         diesel_theoretical_amount: calc?.totalDieselTheoretical ?? 0,
       };
 
+      console.log("[CargarViaje] sheetPayload:", sheetPayload);
+      console.log("[CargarViaje] tripPayload:", tripPayload);
       try {
         // Try create
         const sheet = await createSheet(sheetPayload);
@@ -107,6 +109,7 @@ export function CargarViajePage() {
         return { mode: "created" };
       } catch (err: unknown) {
         const e = err as Error & { status?: number };
+        console.error("[CargarViaje] createSheet error:", e.status, e.message, e);
         // Conflict: merge into existing sheet
         if (e.status === 400 || e.status === 409) {
           const existing = await getSheets({
