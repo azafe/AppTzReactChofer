@@ -91,7 +91,7 @@ export function CargarViajePage() {
         driver_name: currentDriver!.name,
         vehicle_id: currentDriver!.vehicleId ?? null,
         vehicle_label: currentDriver!.vehicleLabel ?? null,
-        diesel_price_snapshot: dp,
+        diesel_price_with_iva: dp,
         liters_loaded: litersLoaded ? parseFloat(litersLoaded) : null,
         observations: observations || null,
         trip_count: validRows.length,
