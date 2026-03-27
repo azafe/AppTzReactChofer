@@ -107,9 +107,9 @@ export function MisViajesPage() {
                     )}
                     <div className="mt-2 flex gap-3 text-xs text-[var(--muted)]">
                       <span>{sheet.trip_count ?? 0} viajes</span>
-                      <span className="text-[var(--text)]">
-                        Bruto: {moneyARS(sheet.total_trip_amount)}
-                      </span>
+                      {sheet.liters_loaded != null && (
+                        <span>{sheet.liters_loaded} L gasoil</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
