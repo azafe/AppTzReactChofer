@@ -40,7 +40,7 @@ function normalizeSheet(raw: Record<string, unknown>): PicadoSheet {
     vehicle_id: (raw.vehicle_id ?? raw.vehicleId ?? null) as string | null,
     vehicle_label: plate,
     license_plate: (raw.license_plate ?? raw.licensePlate ?? plate) as string | null,
-    liters_loaded: (raw.liters_loaded ?? raw.litersLoaded ?? null) as number | null,
+    liters_loaded: (raw.liters_loaded ?? raw.litersLoaded ?? raw.dieselLitersReal ?? null) as number | null,
     observations: (raw.observations ?? raw.notes ?? null) as string | null,
     source_type: (raw.source_type ?? raw.sourceType ?? null) as string | null,
     trip_count: (raw.trip_count ?? raw.tripsCount ?? null) as number | null,
