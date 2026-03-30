@@ -61,7 +61,7 @@ export function LimonesCargarPage() {
       setErrors([]);
       return createLimonViaje({
         fecha,
-        choferId: currentDriver!.driverId,
+        choferId: currentDriver!.id,
         choferNombre: currentDriver!.name,
         camionId: camionVehicleId,
         camionNombre,

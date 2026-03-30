@@ -17,9 +17,9 @@ export function LimonesMisViajesPage() {
   const { from, to } = monthRange(year, month);
 
   const viajesQ = useQuery({
-    queryKey: ["limones-mis-viajes", currentDriver?.driverId, { from, to }],
+    queryKey: ["limones-mis-viajes", currentDriver?.id, { from, to }],
     queryFn: () =>
-      listMisViajesLimones({ choferId: currentDriver!.driverId, from, to }),
+      listMisViajesLimones({ choferId: currentDriver!.id, from, to }),
     enabled: !!currentDriver,
     staleTime: 60_000,
   });
