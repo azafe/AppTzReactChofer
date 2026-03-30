@@ -27,6 +27,13 @@ const ZAFRA_ITEM: NavItem = {
   activePrefix: "/zafra",
 };
 
+const LIMONES_ITEM: NavItem = {
+  to: "/limones/nuevo",
+  label: "Limones",
+  icon: "🍋",
+  activePrefix: "/limones",
+};
+
 export function BottomNav() {
   const { currentDriver } = useAuth();
   const location = useLocation();
@@ -35,6 +42,7 @@ export function BottomNav() {
   const items: NavItem[] = [
     ...(modulos.includes("PICADO") ? [PICADO_ITEM] : []),
     ...(modulos.includes("ZAFRA") ? [ZAFRA_ITEM] : []),
+    ...(modulos.includes("LIMONES") ? [LIMONES_ITEM] : []),
     ...ALWAYS_VISIBLE,
   ];
 
