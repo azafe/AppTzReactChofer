@@ -51,6 +51,21 @@ export async function createLimonViaje(
   return apiPost("/limones/viajes", body);
 }
 
+export type LimonCombustibleOrigen = "BASE_TZ" | "EXTERNA";
+
+export async function createLimonCarga(body: {
+  fecha: string;
+  camionId: string;
+  camionNombre: string;
+  litros: number;
+  tanqueInicial: number | null;
+  kmOdometro: number;
+  origen: LimonCombustibleOrigen;
+  observaciones?: string | null;
+}): Promise<{ ok: boolean }> {
+  return apiPost("/limones/cargas-combustible", body);
+}
+
 export async function getUnidadesActivas(): Promise<{ ok: boolean; unidades: LimonCamion[] }> {
   return apiGet("/unidades?estado=ACTIVA&tipo=CAMION&limit=200");
 }
