@@ -80,11 +80,6 @@ export function LimonesMisViajesPage() {
                 </p>
               </div>
             </div>
-            {v.observaciones && (
-              <p className="mt-2 border-t border-white/5 pt-2 text-xs text-[var(--muted)]">
-                {v.observaciones}
-              </p>
-            )}
           </Card>
         ))}
       </div>

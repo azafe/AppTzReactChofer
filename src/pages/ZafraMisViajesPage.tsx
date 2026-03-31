@@ -99,11 +99,6 @@ export function ZafraMisViajesPage() {
                 )}
               </div>
             </div>
-            {v.observaciones && (
-              <p className="mt-2 text-xs text-[var(--muted)] border-t border-white/5 pt-2">
-                {v.observaciones}
-              </p>
-            )}
           </Card>
         ))}
       </div>
