@@ -6,7 +6,7 @@ import { LimonesNav } from "../components/LimonesNav";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard, EmptyState } from "../components/Spinner";
-import { dateAR, monthRange } from "../lib/format";
+import { dateAR, moneyARS, monthRange } from "../lib/format";
 
 export function LimonesMisViajesPage() {
   const { currentDriver } = useAuth();
@@ -25,7 +25,7 @@ export function LimonesMisViajesPage() {
   });
 
   const viajes = viajesQ.data?.viajes ?? [];
-  const totalKm = viajes.reduce((s, v) => s + v.kmRecorridos, 0);
+  const totalMiPago = viajes.reduce((s, v) => s + (v.corte_chofer ?? 0), 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -45,7 +45,7 @@ export function LimonesMisViajesPage() {
 
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="Viajes" value={viajes.length} />
-        <StatCard label="Km productivos" value={totalKm > 0 ? `${totalKm} km` : "0 km"} />
+        <StatCard label="Mi pago total" value={totalMiPago > 0 ? moneyARS(Math.round(totalMiPago)) : "—"} />
       </div>
 
       {viajesQ.isPending && <PageSpinner />}
@@ -67,19 +67,36 @@ export function LimonesMisViajesPage() {
                 <p className="font-semibold text-[var(--text)]">{dateAR(v.fecha)}</p>
                 <p className="mt-0.5 text-xs text-[var(--muted)]">{v.camionNombre}</p>
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
-                  <span>{v.origen} → {v.destino}</span>
-                  <span>
-                    Km: {v.kmSalida} → {v.kmLlegada}
-                    <span className="ml-1 text-[var(--text)]">({v.kmRecorridos} km)</span>
-                  </span>
+                  <span>Finca: {v.finca?.nombre ?? "—"}</span>
+                  {v.toneladas != null && (
+                    <span>{Number(v.toneladas).toFixed(2)} ton</span>
+                  )}
                 </div>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-display text-xl font-bold text-tz-yellow">
-                  {v.kmRecorridos} km
+                {v.corte_chofer != null ? (
+                  <p className="font-display text-xl font-bold text-tz-yellow">
+                    {moneyARS(Math.round(v.corte_chofer))}
+                  </p>
+                ) : (
+                  <p className="text-sm text-[var(--muted)]">{v.kmRecorridos} km</p>
+                )}
+                <p className="text-[10px] text-[var(--muted)]">
+                  {v.corte_chofer != null ? "Mi pago" : ""}
                 </p>
               </div>
             </div>
+            {v.fotoRemitoUrl && (
+              <div className="mt-2 border-t border-white/5 pt-2">
+                <a href={v.fotoRemitoUrl} target="_blank" rel="noreferrer">
+                  <img
+                    src={v.fotoRemitoUrl}
+                    alt="Remito"
+                    className="h-10 w-10 rounded-lg border border-white/15 object-cover"
+                  />
+                </a>
+              </div>
+            )}
           </Card>
         ))}
       </div>

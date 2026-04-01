@@ -1,16 +1,19 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, useRef, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import {
   createLimonViaje,
   createLimonCarga,
   getUnidadesActivas,
+  listFincasActivas,
+  uploadLimonesFoto,
   type LimonCombustibleOrigen,
 } from "../services/limonesApi";
+import { calcularViaje } from "../utils/limones-calculos";
 import { LimonesNav } from "../components/LimonesNav";
 import { Card } from "../components/Card";
 import { showToast } from "../components/Toast";
-import { todayISO } from "../lib/format";
+import { moneyARS, todayISO } from "../lib/format";
 
 const inputCls =
   "h-11 w-full rounded-2xl border border-white/15 bg-[#0f1115] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-tz-yellow/60";
@@ -21,51 +24,74 @@ export function LimonesCargarPage() {
   const queryClient = useQueryClient();
 
   const [fecha, setFecha] = useState(todayISO());
+  const [fincaId, setFincaId] = useState("");
+  const [pesoRealKg, setPesoRealKg] = useState("");
   const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [camionNombre, setCamionNombre] = useState(currentDriver?.vehicleLabel ?? "");
-  const [origen, setOrigen] = useState("");
-  const [destino, setDestino] = useState("");
   const [kmSalida, setKmSalida] = useState("");
   const [kmLlegada, setKmLlegada] = useState("");
-  const [litrosGasoil, setLitrosGasoil] = useState("");
-  const [origenCombustible, setOrigenCombustible] = useState<LimonCombustibleOrigen>("BASE_TZ");
   const [observaciones, setObservaciones] = useState("");
+  const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
+  const [uploadingRemito, setUploadingRemito] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const remitoInputRef = useRef<HTMLInputElement>(null);
 
   const unidadesQ = useQuery({
     queryKey: ["limones-unidades"],
     queryFn: getUnidadesActivas,
     staleTime: 120_000,
   });
+  const fincasQ = useQuery({
+    queryKey: ["limones-fincas-activas"],
+    queryFn: listFincasActivas,
+    staleTime: 120_000,
+  });
 
   const unidades = unidadesQ.data?.unidades ?? [];
+  const fincas = (fincasQ.data?.fincas ?? []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-  const kmRecorridos =
-    kmSalida && kmLlegada
-      ? Math.max(0, Number(kmLlegada) - Number(kmSalida))
-      : null;
+  const selectedFinca = fincas.find((f) => f.id === fincaId) ?? null;
+  const selectedCamion = unidades.find((u) => u.vehicleId === camionVehicleId) ?? null;
+
+  const preview = useMemo(() => {
+    if (!selectedFinca) return null;
+    const peso = parseFloat(pesoRealKg);
+    if (!Number.isFinite(peso) || peso <= 0) return null;
+    const calc = calcularViaje({
+      peso_real_kg: peso,
+      finca: selectedFinca,
+      consumo_teorico_l100km: selectedCamion?.consumo_teorico_l100km ?? null,
+    });
+    return calc;
+  }, [selectedFinca, pesoRealKg, selectedCamion]);
 
   const mutation = useMutation({
     mutationFn: async () => {
       const errs: string[] = [];
       if (!fecha) errs.push("Ingresá la fecha.");
+      if (!fincaId) errs.push("Seleccioná una finca.");
+      const peso = parseFloat(pesoRealKg);
+      if (pesoRealKg === "" || !Number.isFinite(peso) || peso <= 0)
+        errs.push("Ingresá el peso real en kg.");
       if (!camionVehicleId) errs.push("Seleccioná un camión.");
-      if (!origen.trim()) errs.push("Ingresá el origen.");
-      if (!destino.trim()) errs.push("Ingresá el destino.");
       const kS = Number(kmSalida);
       const kL = Number(kmLlegada);
       if (!Number.isFinite(kS) || kmSalida === "") errs.push("Ingresá km de salida.");
       if (!Number.isFinite(kL) || kmLlegada === "") errs.push("Ingresá km de llegada.");
-      if (Number.isFinite(kS) && Number.isFinite(kL) && kL < kS)
-        errs.push("Km de llegada debe ser mayor o igual a km de salida.");
-      const lts = litrosGasoil !== "" ? Number(litrosGasoil) : null;
-      if (lts !== null && (!Number.isFinite(lts) || lts <= 0))
-        errs.push("Los litros de gasoil deben ser un número mayor a 0.");
+      if (Number.isFinite(kS) && Number.isFinite(kL) && kL <= kS)
+        errs.push("El km de llegada debe ser mayor al de salida.");
       if (errs.length > 0) {
         setErrors(errs);
         throw new Error(errs[0]);
       }
       setErrors([]);
+
+      const finca = fincas.find((f) => f.id === fincaId)!;
+      const calc = calcularViaje({
+        peso_real_kg: peso,
+        finca,
+        consumo_teorico_l100km: selectedCamion?.consumo_teorico_l100km ?? null,
+      });
 
       await createLimonViaje({
         fecha,
@@ -73,35 +99,29 @@ export function LimonesCargarPage() {
         choferNombre: currentDriver!.name,
         camionId: camionVehicleId,
         camionNombre,
-        origen: origen.trim(),
-        destino: destino.trim(),
+        origen: finca.nombre,
+        destino: "Empaque",
         kmSalida: kS,
         kmLlegada: kL,
         observaciones: observaciones.trim() || null,
+        fotoRemitoUrl: fotoRemitoUrl || null,
+        finca_id: finca.id,
+        peso_real_kg: peso,
+        toneladas: calc.toneladas,
+        tarifa_aplicada: finca.precio_bins,
+        ingreso_bruto: calc.ingreso_bruto,
+        corte_chofer: calc.corte_chofer,
       });
-
-      if (lts !== null && lts > 0) {
-        await createLimonCarga({
-          fecha,
-          camionId: camionVehicleId,
-          camionNombre,
-          litros: lts,
-          tanqueInicial: null,
-          kmOdometro: kL,
-          origen: origenCombustible,
-        });
-      }
     },
     onSuccess: () => {
       showToast("Viaje registrado ✓");
       queryClient.invalidateQueries({ queryKey: ["limones-mis-viajes"] });
-      setOrigen("");
-      setDestino("");
+      setFincaId("");
+      setPesoRealKg("");
       setKmSalida("");
       setKmLlegada("");
-      setLitrosGasoil("");
-      setOrigenCombustible("BASE_TZ");
       setObservaciones("");
+      setFotoRemitoUrl(null);
       setErrors([]);
     },
     onError: (e: Error) => {
@@ -125,12 +145,13 @@ export function LimonesCargarPage() {
       <LimonesNav />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* Datos del viaje */}
         <Card>
           <p className="mb-4 text-sm font-semibold text-[var(--text)]">Registrar viaje</p>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Fecha</label>
+              <label className={labelCls}>Fecha *</label>
               <input
                 type="date"
                 className={inputCls}
@@ -139,7 +160,7 @@ export function LimonesCargarPage() {
               />
             </div>
             <div>
-              <label className={labelCls}>Camión</label>
+              <label className={labelCls}>Camión *</label>
               <select
                 className={inputCls}
                 value={camionVehicleId}
@@ -155,32 +176,38 @@ export function LimonesCargarPage() {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Origen</label>
-              <input
-                type="text"
-                className={inputCls}
-                placeholder="Finca / depósito..."
-                value={origen}
-                onChange={(e) => setOrigen(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Destino</label>
-              <input
-                type="text"
-                className={inputCls}
-                placeholder="Empaque / planta..."
-                value={destino}
-                onChange={(e) => setDestino(e.target.value)}
-              />
-            </div>
+          <div className="mt-3">
+            <label className={labelCls}>Finca *</label>
+            <select
+              className={inputCls}
+              value={fincaId}
+              onChange={(e) => setFincaId(e.target.value)}
+            >
+              <option value="">Seleccioná una finca...</option>
+              {fincas.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nombre} ({f.km_distancia} km)
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="mt-3">
+            <label className={labelCls}>Peso real (kg) *</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className={inputCls}
+              placeholder="Ej: 20000"
+              value={pesoRealKg}
+              onChange={(e) => setPesoRealKg(e.target.value)}
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Km Salida</label>
+              <label className={labelCls}>Km Salida *</label>
               <input
                 type="number"
                 min="0"
@@ -192,7 +219,7 @@ export function LimonesCargarPage() {
               />
             </div>
             <div>
-              <label className={labelCls}>Km Llegada</label>
+              <label className={labelCls}>Km Llegada *</label>
               <input
                 type="number"
                 min="0"
@@ -203,47 +230,70 @@ export function LimonesCargarPage() {
                 onChange={(e) => setKmLlegada(e.target.value)}
               />
             </div>
-            <div>
-              <label className={labelCls}>Km Recorridos</label>
-              <div className="flex h-11 items-center rounded-2xl border border-white/8 bg-white/5 px-3 text-sm font-semibold text-[var(--text)]">
-                {kmRecorridos != null && Number.isFinite(kmRecorridos)
-                  ? `${kmRecorridos} km`
-                  : "—"}
+          </div>
+        </Card>
+
+        {/* Preview */}
+        {preview && (
+          <Card>
+            <p className="mb-2 text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Resumen</p>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--muted)]">Toneladas</span>
+                <span className="font-semibold text-[var(--text)]">{preview.toneladas.toFixed(2)} ton</span>
+              </div>
+              <div className="flex justify-between text-sm border-t border-white/8 pt-2">
+                <span className="text-[var(--muted)]">Tu pago</span>
+                <span className="font-bold text-tz-yellow text-base">{moneyARS(Math.round(preview.corte_chofer))}</span>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
-        {/* Gasoil */}
+        {/* Foto */}
         <Card>
-          <p className="mb-3 text-sm font-semibold text-[var(--text)]">Gasoil cargado (opcional)</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Litros cargados</label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                className={inputCls}
-                placeholder="Ej: 150"
-                value={litrosGasoil}
-                onChange={(e) => setLitrosGasoil(e.target.value)}
+          <label className={labelCls}>Foto remito (opcional)</label>
+          <div className="flex items-center gap-3">
+            <input
+              ref={remitoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploadingRemito(true);
+                try {
+                  const res = await uploadLimonesFoto(file, "limones-remito");
+                  setFotoRemitoUrl(res.url);
+                } catch {
+                  showToast("Error al subir la foto", "error");
+                } finally {
+                  setUploadingRemito(false);
+                  e.target.value = "";
+                }
+              }}
+            />
+            {fotoRemitoUrl && (
+              <img
+                src={fotoRemitoUrl}
+                alt="Remito"
+                className="h-10 w-10 rounded-lg border border-white/15 object-cover"
               />
-            </div>
-            <div>
-              <label className={labelCls}>Origen del combustible</label>
-              <select
-                className={inputCls}
-                value={origenCombustible}
-                onChange={(e) => setOrigenCombustible(e.target.value as LimonCombustibleOrigen)}
-              >
-                <option value="BASE_TZ">Base TZ</option>
-                <option value="EXTERNA">Estación de servicio</option>
-              </select>
-            </div>
+            )}
+            <button
+              type="button"
+              disabled={uploadingRemito}
+              onClick={() => remitoInputRef.current?.click()}
+              className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+            >
+              {uploadingRemito ? "Subiendo..." : fotoRemitoUrl ? "Cambiar foto" : "Subir foto remito"}
+            </button>
           </div>
         </Card>
 
+        {/* Observaciones */}
         <Card>
           <label className={labelCls}>Observaciones (opcional)</label>
           <textarea

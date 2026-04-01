@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 const tabs = [
   { to: "/limones/nuevo", label: "Nuevo Viaje" },
   { to: "/limones/mis-viajes", label: "Mis Viajes" },
+  { to: "/limones/mis-cargas", label: "Mis Cargas" },
 ];
 
 export function LimonesNav() {
