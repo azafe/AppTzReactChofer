@@ -3,11 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import {
   createLimonViaje,
-  createLimonCarga,
   getUnidadesActivas,
   listFincasActivas,
   uploadLimonesFoto,
-  type LimonCombustibleOrigen,
 } from "../services/limonesApi";
 import { calcularViaje } from "../utils/limones-calculos";
 import { LimonesNav } from "../components/LimonesNav";
