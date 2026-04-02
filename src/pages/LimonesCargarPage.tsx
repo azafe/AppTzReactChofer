@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, type FormEvent } from "react";
+import { useMemo, useState, useRef, useEffect, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -23,6 +23,9 @@ export function LimonesCargarPage() {
 
   const [fecha, setFecha] = useState(todayISO());
   const [fincaId, setFincaId] = useState("");
+  const [fincaQuery, setFincaQuery] = useState("");
+  const [fincaOpen, setFincaOpen] = useState(false);
+  const fincaRef = useRef<HTMLDivElement>(null);
   const [pesoRealKg, setPesoRealKg] = useState("");
   const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [camionNombre, setCamionNombre] = useState(currentDriver?.vehicleLabel ?? "");
@@ -50,6 +53,20 @@ export function LimonesCargarPage() {
 
   const selectedFinca = fincas.find((f) => f.id === fincaId) ?? null;
   const selectedCamion = unidades.find((u) => u.vehicleId === camionVehicleId) ?? null;
+
+  const fincasFiltradas = fincaQuery.trim()
+    ? fincas.filter((f) => f.nombre.toLowerCase().includes(fincaQuery.toLowerCase()))
+    : fincas;
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (fincaRef.current && !fincaRef.current.contains(e.target as Node)) {
+        setFincaOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const preview = useMemo(() => {
     if (!selectedFinca) return null;
@@ -115,6 +132,8 @@ export function LimonesCargarPage() {
       showToast("Viaje registrado ✓");
       queryClient.invalidateQueries({ queryKey: ["limones-mis-viajes"] });
       setFincaId("");
+      setFincaQuery("");
+      setFincaOpen(false);
       setPesoRealKg("");
       setKmSalida("");
       setKmLlegada("");
@@ -174,20 +193,47 @@ export function LimonesCargarPage() {
             </div>
           </div>
 
-          <div className="mt-3">
+          <div className="mt-3" ref={fincaRef}>
             <label className={labelCls}>Finca *</label>
-            <select
-              className={inputCls}
-              value={fincaId}
-              onChange={(e) => setFincaId(e.target.value)}
-            >
-              <option value="">Seleccioná una finca...</option>
-              {fincas.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.nombre} ({f.km_distancia} km)
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                className={inputCls}
+                placeholder="Buscá una finca..."
+                value={fincaOpen ? fincaQuery : (selectedFinca ? `${selectedFinca.nombre} (${selectedFinca.km_distancia} km)` : "")}
+                onFocus={() => {
+                  setFincaOpen(true);
+                  setFincaQuery("");
+                }}
+                onChange={(e) => {
+                  setFincaQuery(e.target.value);
+                  setFincaOpen(true);
+                }}
+              />
+              {fincaOpen && fincasFiltradas.length > 0 && (
+                <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-2xl border border-white/15 bg-[#0f1115] py-1 shadow-xl">
+                  {fincasFiltradas.map((f) => (
+                    <li
+                      key={f.id}
+                      className={`cursor-pointer px-3 py-2 text-sm hover:bg-white/10 ${f.id === fincaId ? "text-tz-yellow" : "text-[var(--text)]"}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setFincaId(f.id);
+                        setFincaQuery("");
+                        setFincaOpen(false);
+                      }}
+                    >
+                      {f.nombre} <span className="text-[var(--muted)]">({f.km_distancia} km)</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {fincaOpen && fincasFiltradas.length === 0 && fincaQuery && (
+                <div className="absolute z-20 mt-1 w-full rounded-2xl border border-white/15 bg-[#0f1115] px-3 py-3 text-sm text-[var(--muted)] shadow-xl">
+                  Sin resultados
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-3">
