@@ -50,8 +50,6 @@ export type LimonViajeBody = {
   camionNombre: string;
   origen: string;
   destino: string;
-  kmSalida: number;
-  kmLlegada: number;
   observaciones?: string | null;
   fotoRemitoUrl?: string | null;
   finca_id?: string | null;

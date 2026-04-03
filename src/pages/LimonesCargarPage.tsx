@@ -29,8 +29,6 @@ export function LimonesCargarPage() {
   const [pesoRealKg, setPesoRealKg] = useState("");
   const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [camionNombre, setCamionNombre] = useState(currentDriver?.vehicleLabel ?? "");
-  const [kmSalida, setKmSalida] = useState("");
-  const [kmLlegada, setKmLlegada] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
   const [uploadingRemito, setUploadingRemito] = useState(false);
@@ -89,12 +87,6 @@ export function LimonesCargarPage() {
       if (pesoRealKg === "" || !Number.isFinite(peso) || peso <= 0)
         errs.push("Ingresá el peso real en kg.");
       if (!camionVehicleId) errs.push("Seleccioná un camión.");
-      const kS = Number(kmSalida);
-      const kL = Number(kmLlegada);
-      if (!Number.isFinite(kS) || kmSalida === "") errs.push("Ingresá km de salida.");
-      if (!Number.isFinite(kL) || kmLlegada === "") errs.push("Ingresá km de llegada.");
-      if (Number.isFinite(kS) && Number.isFinite(kL) && kL <= kS)
-        errs.push("El km de llegada debe ser mayor al de salida.");
       if (errs.length > 0) {
         setErrors(errs);
         throw new Error(errs[0]);
@@ -116,8 +108,6 @@ export function LimonesCargarPage() {
         camionNombre,
         origen: finca.nombre,
         destino: "Empaque",
-        kmSalida: kS,
-        kmLlegada: kL,
         observaciones: observaciones.trim() || null,
         fotoRemitoUrl: fotoRemitoUrl || null,
         finca_id: finca.id,
@@ -135,8 +125,6 @@ export function LimonesCargarPage() {
       setFincaQuery("");
       setFincaOpen(false);
       setPesoRealKg("");
-      setKmSalida("");
-      setKmLlegada("");
       setObservaciones("");
       setFotoRemitoUrl(null);
       setErrors([]);
@@ -249,32 +237,6 @@ export function LimonesCargarPage() {
             />
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Km Salida *</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                className={inputCls}
-                placeholder="0"
-                value={kmSalida}
-                onChange={(e) => setKmSalida(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Km Llegada *</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                className={inputCls}
-                placeholder="0"
-                value={kmLlegada}
-                onChange={(e) => setKmLlegada(e.target.value)}
-              />
-            </div>
-          </div>
         </Card>
 
         {/* Preview */}
