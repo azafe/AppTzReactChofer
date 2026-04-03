@@ -5,8 +5,8 @@ import { getSheets, getAnticipos } from "../services/picadoApi";
 import { listMisViajesLimones } from "../services/limonesApi";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
-import { PageSpinner, ErrorCard, EmptyState } from "../components/Spinner";
-import { moneyARS, dateAR, monthRange } from "../lib/format";
+import { PageSpinner, ErrorCard } from "../components/Spinner";
+import { moneyARS, monthRange } from "../lib/format";
 
 export function MiPagoPage() {
   const { currentDriver } = useAuth();
@@ -15,12 +15,15 @@ export function MiPagoPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
 
   const { from, to } = monthRange(year, month);
+  const modulos = currentDriver?.modulos ?? [];
+
+  const hasPicado = modulos.includes("PICADO");
+  const hasLimones = modulos.includes("LIMONES");
 
   const sheetsQuery = useQuery({
     queryKey: ["picado", "sheets", currentDriver?.id, { from, to, limit: 200 }],
-    queryFn: () =>
-      getSheets({ driverId: currentDriver!.id, from, to, limit: 200 }),
-    enabled: !!currentDriver,
+    queryFn: () => getSheets({ driverId: currentDriver!.id, from, to, limit: 200 }),
+    enabled: !!currentDriver && hasPicado,
     staleTime: 60_000,
   });
 
@@ -34,7 +37,7 @@ export function MiPagoPage() {
   const limonesQ = useQuery({
     queryKey: ["limones-mis-viajes-pago", currentDriver?.id, { from, to }],
     queryFn: () => listMisViajesLimones({ choferId: currentDriver!.id, from, to }),
-    enabled: !!currentDriver,
+    enabled: !!currentDriver && hasLimones,
     staleTime: 60_000,
   });
 
@@ -42,27 +45,25 @@ export function MiPagoPage() {
   const anticipos = anticiposQuery.data ?? [];
   const limonesViajes = limonesQ.data?.viajes ?? [];
 
-  // Picado
-  const totalViajes = sheets.reduce((s, sh) => s + (sh.trip_count ?? 0), 0);
-  const totalBruto = sheets.reduce((s, sh) => s + (sh.total_trip_amount ?? 0), 0);
-  const totalDriverAmount = sheets.reduce((s, sh) => s + (sh.driver_amount ?? 0), 0);
+  const picadoIngresos = sheets.reduce((s, sh) => s + (sh.driver_amount ?? 0), 0);
+  const picadoViajes = sheets.reduce((s, sh) => s + (sh.trip_count ?? 0), 0);
 
-  // Limones
-  const limonesTotalViajes = limonesViajes.length;
-  const limonesTotalIngresos = limonesViajes.reduce((s, v) => s + (v.corte_chofer ?? 0), 0);
+  const limonesIngresos = limonesViajes.reduce((s, v) => s + (v.corte_chofer ?? 0), 0);
+  const limonesViajesCount = limonesViajes.length;
 
-  // Anticipos (compartidos)
   const totalAnticipos = anticipos.reduce((s, a) => s + a.monto, 0);
+  const totalIngresos = (hasPicado ? picadoIngresos : 0) + (hasLimones ? limonesIngresos : 0);
+  const aCobrar = totalIngresos - totalAnticipos;
 
-  // A cobrar total
-  const saldoPendiente = totalDriverAmount + limonesTotalIngresos - totalAnticipos;
+  const isPending =
+    (hasPicado && sheetsQuery.isPending) ||
+    anticiposQuery.isPending ||
+    (hasLimones && limonesQ.isPending);
 
-  const isPending = sheetsQuery.isPending || anticiposQuery.isPending || limonesQ.isPending;
-  const isError = sheetsQuery.isError || anticiposQuery.isError || limonesQ.isError;
-
-  const sortedSheets = [...sheets].sort((a, b) =>
-    a.sheet_date.localeCompare(b.sheet_date)
-  );
+  const isError =
+    (hasPicado && sheetsQuery.isError) ||
+    anticiposQuery.isError ||
+    (hasLimones && limonesQ.isError);
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,10 +72,7 @@ export function MiPagoPage() {
         <MonthPicker
           year={year}
           month={month}
-          onChange={(y, m) => {
-            setYear(y);
-            setMonth(m);
-          }}
+          onChange={(y, m) => { setYear(y); setMonth(m); }}
         />
       </div>
 
@@ -83,123 +81,52 @@ export function MiPagoPage() {
         <ErrorCard
           message="No se pudo cargar la información de pago"
           onRetry={() => {
-            sheetsQuery.refetch();
+            if (hasPicado) sheetsQuery.refetch();
             anticiposQuery.refetch();
-            limonesQ.refetch();
+            if (hasLimones) limonesQ.refetch();
           }}
         />
       )}
 
       {!isPending && !isError && (
         <>
-          {/* A cobrar total */}
+          {/* A cobrar */}
           <Card className="border-tz-yellow/30 bg-[var(--accent-soft)]">
             <p className="text-xs font-semibold uppercase tracking-widest text-tz-yellow">
               A cobrar
             </p>
             <p className="mt-1 font-display text-4xl font-bold text-tz-yellow">
-              {moneyARS(saldoPendiente)}
+              {moneyARS(aCobrar)}
             </p>
-            <p className="mt-1 text-xs text-[var(--muted)]">Total ingresos menos anticipos recibidos</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">Ingresos menos anticipos recibidos</p>
           </Card>
 
-          {/* Stats globales */}
+          {/* Anticipos */}
           <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Ingresos totales" value={moneyARS(totalIngresos)} accent />
             <StatCard label="Anticipos recibidos" value={moneyARS(totalAnticipos)} />
-            <StatCard label="A cobrar" value={moneyARS(saldoPendiente)} accent={saldoPendiente > 0} />
           </div>
 
-          {/* ─── Sección Limones ─── */}
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Limones</p>
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Total viajes" value={limonesTotalViajes} />
-              <StatCard label="Ingresos" value={moneyARS(limonesTotalIngresos)} accent />
-            </div>
-
-            {limonesViajes.length > 0 && (
-              <Card className="p-0 overflow-hidden mt-3">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-[var(--muted)] border-b border-white/8">
-                        <th className="px-4 py-2 font-medium">Fecha</th>
-                        <th className="px-4 py-2 font-medium">Finca</th>
-                        <th className="px-4 py-2 font-medium text-right text-tz-yellow">Mi pago</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...limonesViajes]
-                        .sort((a, b) => a.fecha.localeCompare(b.fecha))
-                        .map((v) => (
-                          <tr key={v.id} className="border-t border-white/5 hover:bg-white/3 transition-colors">
-                            <td className="px-4 py-2.5 text-[var(--text)] whitespace-nowrap">{dateAR(v.fecha)}</td>
-                            <td className="px-4 py-2.5 text-[var(--muted)]">{v.finca?.nombre ?? "—"}</td>
-                            <td className="px-4 py-2.5 text-right font-semibold text-tz-yellow">
-                              {v.corte_chofer != null ? moneyARS(v.corte_chofer) : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-white/15">
-                        <td className="px-4 py-3 text-xs font-bold text-[var(--muted)] uppercase" colSpan={2}>Total</td>
-                        <td className="px-4 py-3 text-right font-bold text-tz-yellow">{moneyARS(limonesTotalIngresos)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
+          {/* Módulos activos */}
+          <div className="flex flex-col gap-4">
+            {hasLimones && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Limones</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard label="Total viajes" value={limonesViajesCount} />
+                  <StatCard label="Ingresos" value={moneyARS(limonesIngresos)} accent />
                 </div>
-              </Card>
+              </div>
             )}
 
-            {limonesViajes.length === 0 && (
-              <EmptyState message="No hay viajes de limones este mes" />
-            )}
-          </div>
-
-          {/* ─── Sección Picado ─── */}
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Picado</p>
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Total viajes" value={totalViajes} />
-              <StatCard label="Ingresos" value={moneyARS(totalDriverAmount)} accent />
-            </div>
-
-            {sheets.length === 0 ? (
-              <EmptyState message="No hay viajes de picado este mes" />
-            ) : (
-              <Card className="p-0 overflow-hidden mt-3">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-[var(--muted)] border-b border-white/8">
-                        <th className="px-4 py-2 font-medium">Fecha</th>
-                        <th className="px-4 py-2 font-medium text-center">Viajes</th>
-                        <th className="px-4 py-2 font-medium text-right">Bruto</th>
-                        <th className="px-4 py-2 font-medium text-right text-tz-yellow">Tu pago</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedSheets.map((sheet) => (
-                        <tr key={sheet.id} className="border-t border-white/5 hover:bg-white/3 transition-colors">
-                          <td className="px-4 py-2.5 text-[var(--text)]">{dateAR(sheet.sheet_date)}</td>
-                          <td className="px-4 py-2.5 text-center text-[var(--muted)]">{sheet.trip_count ?? 0}</td>
-                          <td className="px-4 py-2.5 text-right text-[var(--muted)]">{moneyARS(sheet.total_trip_amount)}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-tz-yellow">{moneyARS(sheet.driver_amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-white/15">
-                        <td className="px-4 py-3 text-xs font-bold text-[var(--muted)] uppercase">Total</td>
-                        <td className="px-4 py-3 text-center font-bold text-[var(--text)]">{totalViajes}</td>
-                        <td className="px-4 py-3 text-right font-bold text-[var(--text)]">{moneyARS(totalBruto)}</td>
-                        <td className="px-4 py-3 text-right font-bold text-tz-yellow">{moneyARS(totalDriverAmount)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
+            {hasPicado && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Picado</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard label="Total viajes" value={picadoViajes} />
+                  <StatCard label="Ingresos" value={moneyARS(picadoIngresos)} accent />
                 </div>
-              </Card>
+              </div>
             )}
           </div>
         </>
