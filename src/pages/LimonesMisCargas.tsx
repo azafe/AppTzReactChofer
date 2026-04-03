@@ -186,7 +186,7 @@ function NuevaCargaModal({
                 ref={fotoInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
+                
                 className="hidden"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
@@ -385,7 +385,7 @@ function CargaCard({
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          
           className="hidden"
           onChange={async (e) => {
             const file = e.target.files?.[0];
