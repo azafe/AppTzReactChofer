@@ -11,6 +11,15 @@ import { LimonesCargarPage } from "../pages/LimonesCargarPage";
 import { LimonesMisViajesPage } from "../pages/LimonesMisViajesPage";
 import { LimonesMisCargas } from "../pages/LimonesMisCargas";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { useAuth } from "../context/AuthContext";
+
+function HomeRedirect() {
+  const { currentDriver } = useAuth();
+  const modulos = currentDriver?.modulos ?? [];
+  if (modulos.includes("LIMONES")) return <Navigate to="/limones/nuevo" replace />;
+  if (modulos.includes("ZAFRA")) return <Navigate to="/zafra/nuevo" replace />;
+  return <Navigate to="/picado/nuevo" replace />;
+}
 
 export const router = createBrowserRouter([
   {
@@ -25,7 +34,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/picado/nuevo" replace /> },
+      { index: true, element: <HomeRedirect /> },
       // Picado
       { path: "picado", element: <Navigate to="/picado/nuevo" replace /> },
       { path: "picado/nuevo", element: <CargarViajePage /> },
@@ -49,6 +58,6 @@ export const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/picado/nuevo" replace />,
+    element: <Navigate to="/" replace />,
   },
 ]);
