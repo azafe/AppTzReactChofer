@@ -10,7 +10,6 @@ import { ZafraMisViajesPage } from "../pages/ZafraMisViajesPage";
 import { LimonesCargarPage } from "../pages/LimonesCargarPage";
 import { LimonesMisViajesPage } from "../pages/LimonesMisViajesPage";
 import { LimonesMisCargas } from "../pages/LimonesMisCargas";
-import { LimonesMiPagoPage } from "../pages/LimonesMiPagoPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -43,7 +42,6 @@ export const router = createBrowserRouter([
       { path: "limones/nuevo", element: <LimonesCargarPage /> },
       { path: "limones/mis-viajes", element: <LimonesMisViajesPage /> },
       { path: "limones/mis-cargas", element: <LimonesMisCargas /> },
-      { path: "limones/mi-pago", element: <LimonesMiPagoPage /> },
       // Siempre visible
       { path: "anticipos", element: <AnticiposPage /> },
       { path: "mi-pago", element: <MiPagoPage /> },
