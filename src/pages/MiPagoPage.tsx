@@ -55,6 +55,9 @@ export function MiPagoPage() {
   const totalIngresos = (hasPicado ? picadoIngresos : 0) + (hasLimones ? limonesIngresos : 0);
   const aCobrar = totalIngresos - totalAnticipos;
 
+  const limonesPromPorViaje = limonesViajesCount > 0 ? limonesIngresos / limonesViajesCount : null;
+  const picadoPromPorViaje = picadoViajes > 0 ? picadoIngresos / picadoViajes : null;
+
   const isPending =
     (hasPicado && sheetsQuery.isPending) ||
     anticiposQuery.isPending ||
@@ -101,11 +104,20 @@ export function MiPagoPage() {
             <p className="mt-1 text-xs text-[var(--muted)]">Ingresos menos anticipos recibidos</p>
           </Card>
 
-          {/* Anticipos */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Ingresos totales" value={moneyARS(totalIngresos)} accent />
-            <StatCard label="Anticipos recibidos" value={moneyARS(totalAnticipos)} />
-          </div>
+          {/* Desglose ingresos − anticipos */}
+          <Card>
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[var(--muted)]">Ingresos</span>
+                <span className="font-semibold text-tz-yellow">{moneyARS(totalIngresos)}</span>
+              </div>
+              <div className="border-t border-[var(--border)]" />
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[var(--muted)]">− Anticipos</span>
+                <span className="font-semibold">{moneyARS(totalAnticipos)}</span>
+              </div>
+            </div>
+          </Card>
 
           {/* Módulos activos */}
           <div className="flex flex-col gap-4">
@@ -113,8 +125,8 @@ export function MiPagoPage() {
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Limones</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatCard label="Total viajes" value={limonesViajesCount} />
-                  <StatCard label="Ingresos" value={moneyARS(limonesIngresos)} accent />
+                  <StatCard label="Viajes" value={limonesViajesCount} />
+                  <StatCard label="Prom/viaje" value={limonesPromPorViaje != null ? moneyARS(limonesPromPorViaje) : "—"} accent />
                 </div>
               </div>
             )}
@@ -123,8 +135,8 @@ export function MiPagoPage() {
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Picado</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatCard label="Total viajes" value={picadoViajes} />
-                  <StatCard label="Ingresos" value={moneyARS(picadoIngresos)} accent />
+                  <StatCard label="Viajes" value={picadoViajes} />
+                  <StatCard label="Prom/viaje" value={picadoPromPorViaje != null ? moneyARS(picadoPromPorViaje) : "—"} accent />
                 </div>
               </div>
             )}
