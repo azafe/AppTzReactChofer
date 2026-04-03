@@ -4,6 +4,7 @@ const tabs = [
   { to: "/limones/nuevo", label: "Nuevo Viaje" },
   { to: "/limones/mis-viajes", label: "Mis Viajes" },
   { to: "/limones/mis-cargas", label: "Combustible" },
+  { to: "/limones/mi-pago", label: "Mi Pago" },
 ];
 
 export function LimonesNav() {
