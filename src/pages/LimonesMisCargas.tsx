@@ -265,9 +265,9 @@ export function LimonesMisCargas() {
   const { from, to } = monthRange(year, month);
 
   const cargasQ = useQuery({
-    queryKey: ["limones-mis-cargas", currentDriver?.id, { from, to }],
-    queryFn: () => listMisCargas({ choferId: currentDriver!.id, from, to }),
-    enabled: !!currentDriver,
+    queryKey: ["limones-mis-cargas", currentDriver?.vehicleId, { from, to }],
+    queryFn: () => listMisCargas({ camionId: currentDriver!.vehicleId!, from, to }),
+    enabled: !!currentDriver?.vehicleId,
     staleTime: 60_000,
   });
 

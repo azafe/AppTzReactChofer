@@ -103,13 +103,15 @@ export async function createLimonCarga(body: {
 }
 
 export async function listMisCargas(params: {
-  choferId: string;
+  choferId?: string;
+  camionId?: string;
   from?: string;
   to?: string;
   limit?: number;
 }): Promise<{ ok: boolean; cargas: LimonCarga[] }> {
   const q = new URLSearchParams();
-  q.set("choferId", params.choferId);
+  if (params.choferId) q.set("choferId", params.choferId);
+  if (params.camionId) q.set("camionId", params.camionId);
   if (params.from) q.set("from", params.from);
   if (params.to) q.set("to", params.to);
   q.set("limit", String(params.limit ?? 200));
