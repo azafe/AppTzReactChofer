@@ -27,6 +27,7 @@ export function LimonesCargarPage() {
   const [fincaOpen, setFincaOpen] = useState(false);
   const fincaRef = useRef<HTMLDivElement>(null);
   const [pesoRealKg, setPesoRealKg] = useState("");
+  const [esVacio, setEsVacio] = useState(false);
   const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [camionNombre, setCamionNombre] = useState(currentDriver?.vehicleLabel ?? "");
   const [observaciones, setObservaciones] = useState("");
@@ -68,6 +69,12 @@ export function LimonesCargarPage() {
 
   const preview = useMemo(() => {
     if (!selectedFinca) return null;
+    if (esVacio) {
+      if (selectedFinca.precio_vacio == null) return null;
+      const ingreso_bruto = selectedFinca.precio_vacio;
+      const corte_chofer = ingreso_bruto * 0.15;
+      return { esVacio: true as const, toneladas: null, ingreso_bruto, corte_chofer, consumo_teorico_litros: null };
+    }
     const peso = parseFloat(pesoRealKg);
     if (!Number.isFinite(peso) || peso <= 0) return null;
     const calc = calcularViaje({
@@ -75,48 +82,78 @@ export function LimonesCargarPage() {
       finca: selectedFinca,
       consumo_teorico_l100km: selectedCamion?.consumo_teorico_l100km ?? null,
     });
-    return calc;
-  }, [selectedFinca, pesoRealKg, selectedCamion]);
+    return { ...calc, esVacio: false as const };
+  }, [selectedFinca, pesoRealKg, selectedCamion, esVacio]);
 
   const mutation = useMutation({
     mutationFn: async () => {
       const errs: string[] = [];
       if (!fecha) errs.push("Ingresá la fecha.");
       if (!fincaId) errs.push("Seleccioná una finca.");
-      const peso = parseFloat(pesoRealKg);
-      if (pesoRealKg === "" || !Number.isFinite(peso) || peso <= 0)
-        errs.push("Ingresá el peso real en kg.");
       if (!camionVehicleId) errs.push("Seleccioná un camión.");
+
+      const finca = fincas.find((f) => f.id === fincaId) ?? null;
+
+      if (esVacio) {
+        if (finca && finca.precio_vacio == null)
+          errs.push("Esta finca no tiene tarifa de vacíos.");
+      } else {
+        const peso = parseFloat(pesoRealKg);
+        if (pesoRealKg === "" || !Number.isFinite(peso) || peso <= 0)
+          errs.push("Ingresá el peso real en kg.");
+      }
+
       if (errs.length > 0) {
         setErrors(errs);
         throw new Error(errs[0]);
       }
       setErrors([]);
 
-      const finca = fincas.find((f) => f.id === fincaId)!;
-      const calc = calcularViaje({
-        peso_real_kg: peso,
-        finca,
-        consumo_teorico_l100km: selectedCamion?.consumo_teorico_l100km ?? null,
-      });
-
-      await createLimonViaje({
-        fecha,
-        choferId: currentDriver!.id,
-        choferNombre: currentDriver!.name,
-        camionId: camionVehicleId,
-        camionNombre,
-        origen: finca.nombre,
-        destino: "Empaque",
-        observaciones: observaciones.trim() || null,
-        fotoRemitoUrl: fotoRemitoUrl || null,
-        finca_id: finca.id,
-        peso_real_kg: peso,
-        toneladas: calc.toneladas,
-        tarifa_aplicada: finca.precio_bins,
-        ingreso_bruto: calc.ingreso_bruto,
-        corte_chofer: calc.corte_chofer,
-      });
+      if (esVacio) {
+        await createLimonViaje({
+          fecha,
+          choferId: currentDriver!.id,
+          choferNombre: currentDriver!.name,
+          camionId: camionVehicleId,
+          camionNombre,
+          origen: finca!.nombre,
+          destino: "Empaque",
+          observaciones: observaciones.trim() || null,
+          fotoRemitoUrl: fotoRemitoUrl || null,
+          finca_id: finca!.id,
+          peso_real_kg: null,
+          toneladas: null,
+          tarifa_aplicada: null,
+          ingreso_bruto: finca!.precio_vacio!,
+          corte_chofer: finca!.precio_vacio! * 0.15,
+          es_vacio: true,
+        });
+      } else {
+        const peso = parseFloat(pesoRealKg);
+        const calc = calcularViaje({
+          peso_real_kg: peso,
+          finca: finca!,
+          consumo_teorico_l100km: selectedCamion?.consumo_teorico_l100km ?? null,
+        });
+        await createLimonViaje({
+          fecha,
+          choferId: currentDriver!.id,
+          choferNombre: currentDriver!.name,
+          camionId: camionVehicleId,
+          camionNombre,
+          origen: finca!.nombre,
+          destino: "Empaque",
+          observaciones: observaciones.trim() || null,
+          fotoRemitoUrl: fotoRemitoUrl || null,
+          finca_id: finca!.id,
+          peso_real_kg: peso,
+          toneladas: calc.toneladas,
+          tarifa_aplicada: finca!.precio_bins,
+          ingreso_bruto: calc.ingreso_bruto,
+          corte_chofer: calc.corte_chofer,
+          es_vacio: false,
+        });
+      }
     },
     onSuccess: () => {
       showToast("Viaje registrado ✓");
@@ -125,6 +162,7 @@ export function LimonesCargarPage() {
       setFincaQuery("");
       setFincaOpen(false);
       setPesoRealKg("");
+      setEsVacio(false);
       setObservaciones("");
       setFotoRemitoUrl(null);
       setErrors([]);
@@ -224,30 +262,62 @@ export function LimonesCargarPage() {
             </div>
           </div>
 
-          <div className="mt-3">
-            <label className={labelCls}>Peso real (kg) *</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className={inputCls}
-              placeholder="Ej: 20000"
-              value={pesoRealKg}
-              onChange={(e) => setPesoRealKg(e.target.value)}
-            />
-          </div>
+          {fincaId && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="es-vacio"
+                checked={esVacio}
+                onChange={(e) => {
+                  setEsVacio(e.target.checked);
+                  setPesoRealKg("");
+                }}
+                className="accent-tz-yellow h-4 w-4"
+              />
+              <label htmlFor="es-vacio" className="text-sm text-[var(--muted)]">
+                Viaje en vacío
+              </label>
+            </div>
+          )}
+
+          {!esVacio && (
+            <div className="mt-3">
+              <label className={labelCls}>Peso real (kg) *</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={inputCls}
+                placeholder="Ej: 20000"
+                value={pesoRealKg}
+                onChange={(e) => setPesoRealKg(e.target.value)}
+              />
+            </div>
+          )}
 
         </Card>
 
         {/* Preview */}
         {preview && (
           <Card>
-            <p className="mb-2 text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Resumen</p>
+            <div className="mb-2 flex items-center gap-2">
+              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Resumen</p>
+              {preview.esVacio && (
+                <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[9px] font-semibold text-orange-400">VACÍO</span>
+              )}
+            </div>
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--muted)]">Toneladas</span>
-                <span className="font-semibold text-[var(--text)]">{preview.toneladas.toFixed(2)} ton</span>
-              </div>
+              {preview.esVacio ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--muted)]">Tarifa vacíos</span>
+                  <span className="font-semibold text-[var(--text)]">{moneyARS(Math.round(preview.ingreso_bruto))} fijo</span>
+                </div>
+              ) : (
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--muted)]">Toneladas</span>
+                  <span className="font-semibold text-[var(--text)]">{preview.toneladas!.toFixed(2)} ton</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm border-t border-white/8 pt-2">
                 <span className="text-[var(--muted)]">Tu pago</span>
                 <span className="font-bold text-tz-yellow text-base">{moneyARS(Math.round(preview.corte_chofer))}</span>

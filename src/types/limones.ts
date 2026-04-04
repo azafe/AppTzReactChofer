@@ -4,6 +4,7 @@ export interface LimonFinca {
   km_distancia: number;
   precio_bins: number;
   precio_granel: number;
+  precio_vacio: number | null;
   activa: boolean;
   vigente_desde: string;
   created_at: string;

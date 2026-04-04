@@ -67,7 +67,12 @@ export function LimonesMisViajesPage() {
                 <p className="font-semibold text-[var(--text)]">{dateAR(v.fecha)}</p>
                 <p className="mt-0.5 text-xs text-[var(--muted)]">{v.camionNombre}</p>
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
-                  <span>Finca: {v.finca?.nombre ?? "—"}</span>
+                  <span>
+                    Finca: {v.finca?.nombre ?? "—"}
+                    {v.es_vacio && (
+                      <span className="ml-1 rounded-full bg-orange-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-orange-400">VACÍO</span>
+                    )}
+                  </span>
                   {v.toneladas != null && (
                     <span>{Number(v.toneladas).toFixed(2)} ton</span>
                   )}
