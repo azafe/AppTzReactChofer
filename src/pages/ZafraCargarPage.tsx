@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import {
   createZafraViaje,
+  createLugar,
+  createFrente,
   getLugares,
   getFrentes,
   getZafraConfig,
@@ -15,6 +17,7 @@ import {
 import { ZafraNav } from "../components/ZafraNav";
 import { Card } from "../components/Card";
 import { showToast } from "../components/Toast";
+import { CreatableCombobox } from "../components/CreatableCombobox";
 import { moneyARS, todayISO } from "../lib/format";
 
 const DEFAULT_CONFIG: ZafraConfig = {
@@ -65,7 +68,9 @@ export function ZafraCargarPage() {
   const [fecha, setFecha] = useState(todayISO());
   const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [lugarId, setLugarId] = useState("");
+  const [lugarNombre, setLugarNombre] = useState("");
   const [frenteId, setFrenteId] = useState("");
+  const [frenteNumero, setFrenteNumero] = useState("");
   const [kmSalida, setKmSalida] = useState("");
   const [kmLlegada, setKmLlegada] = useState("");
   const [gasoil, setGasoil] = useState("");
@@ -148,9 +153,6 @@ export function ZafraCargarPage() {
       porcentajeComision: resolvedConfig.porcentajeComision,
     });
   }, [modalidad, kmIngenioFinca, pesoN, resolvedConfig]);
-
-  const lugarNombre = (lugaresQ.data?.lugares ?? []).find((l) => l.id === lugarId)?.nombre ?? "";
-  const frenteNumero = (frentesQ.data?.frentes ?? []).find((f) => f.id === frenteId)?.numero ?? "";
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -307,33 +309,41 @@ export function ZafraCargarPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Lugar</label>
-              <select
+              <CreatableCombobox
+                items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
                 value={lugarId}
-                onChange={(e) => setLugarId(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">— Opcional —</option>
-                {(lugaresQ.data?.lugares ?? []).map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.nombre}
-                  </option>
-                ))}
-              </select>
+                isLoading={lugaresQ.isLoading}
+                onSelect={(id, label) => { setLugarId(id); setLugarNombre(label); }}
+                onCreate={async (text) => {
+                  try {
+                    const res = await createLugar({ nombre: text });
+                    queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
+                    return { id: res.lugar.id, label: res.lugar.nombre };
+                  } catch {
+                    showToast("Error al crear el lugar", "error");
+                    throw new Error("create failed");
+                  }
+                }}
+              />
             </div>
             <div>
               <label className={labelCls}>Frente</label>
-              <select
+              <CreatableCombobox
+                items={(frentesQ.data?.frentes ?? []).map((f) => ({ id: f.id, label: f.numero }))}
                 value={frenteId}
-                onChange={(e) => setFrenteId(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">— Opcional —</option>
-                {(frentesQ.data?.frentes ?? []).map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.numero}{f.nombre ? ` – ${f.nombre}` : ""}
-                  </option>
-                ))}
-              </select>
+                isLoading={frentesQ.isLoading}
+                onSelect={(id, label) => { setFrenteId(id); setFrenteNumero(label); }}
+                onCreate={async (text) => {
+                  try {
+                    const res = await createFrente({ numero: text });
+                    queryClient.invalidateQueries({ queryKey: ["zafra-frentes"] });
+                    return { id: res.frente.id, label: res.frente.numero };
+                  } catch {
+                    showToast("Error al crear el frente", "error");
+                    throw new Error("create failed");
+                  }
+                }}
+              />
             </div>
           </div>
         </Card>

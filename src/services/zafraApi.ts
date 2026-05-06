@@ -112,8 +112,20 @@ export async function getLugares(): Promise<{ ok: boolean; lugares: ZafraLugar[]
   return apiGet("/registro-viajes/lugares");
 }
 
+export async function createLugar(dto: {
+  nombre: string;
+}): Promise<{ ok: boolean; lugar: ZafraLugar }> {
+  return apiPost("/registro-viajes/lugares", dto);
+}
+
 export async function getFrentes(): Promise<{ ok: boolean; frentes: ZafraFrente[] }> {
   return apiGet("/registro-viajes/frentes");
+}
+
+export async function createFrente(dto: {
+  numero: string;
+}): Promise<{ ok: boolean; frente: ZafraFrente }> {
+  return apiPost("/registro-viajes/frentes", dto);
 }
 
 export async function getZafraConfig(): Promise<{ ok: boolean; config: ZafraConfig | null }> {
