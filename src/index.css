@@ -55,3 +55,9 @@ textarea {
 #root {
   min-height: 100dvh;
 }
+
+@layer utilities {
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pb-nav-safe { padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }
+}

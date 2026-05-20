@@ -3,6 +3,7 @@ import { TopBar } from "../components/TopBar";
 import { BottomNav } from "../components/BottomNav";
 import { SideNav } from "../components/SideNav";
 import { ToastContainer } from "../components/Toast";
+import { InstallPrompt } from "../components/InstallPrompt";
 
 export function Layout() {
   return (
@@ -18,6 +19,7 @@ export function Layout() {
       </div>
       <BottomNav />
       <ToastContainer />
+      <InstallPrompt />
     </div>
   );
 }
