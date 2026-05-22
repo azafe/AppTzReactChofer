@@ -8,9 +8,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      strategies: "injectManifest",
-      srcDir: "src",
-      filename: "sw.ts",
       registerType: "autoUpdate",
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
@@ -37,8 +34,19 @@ export default defineConfig({
           },
         ],
       },
-      injectManifest: {
+      workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/tz-backend-production\.up\.railway\.app\/.*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-cache",
+              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+              networkTimeoutSeconds: 10,
+            },
+          },
+        ],
       },
     }),
   ],
