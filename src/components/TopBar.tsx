@@ -11,7 +11,7 @@ export function TopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/8 bg-[var(--ink-900)]/90 px-4 backdrop-blur-md">
+    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/8 bg-[var(--ink-900)]/90 px-4 pb-3 pt-safe backdrop-blur-md">
       <div className="flex items-center gap-2">
         <span className="text-xl">🚛</span>
         <div>
