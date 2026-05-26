@@ -31,11 +31,12 @@ export type ZafraViaje = {
   tarifaBaseSnapshot?: number | null;
   tarifaPorKmSnapshot?: number | null;
   comisionPctSnapshot?: number | null;
+  kmPagaIngenioSnapshot?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
 
-export type ZafraLugar = { id: string; nombre: string };
+export type ZafraLugar = { id: string; nombre: string; kmQuePagaIngenio?: number | null };
 export type ZafraFrente = { id: string; numero: string; nombre?: string | null };
 export type ZafraCamion = { vehicleId: string; vehicleLabel: string };
 
@@ -77,6 +78,7 @@ export type ZafraViajeBody = {
   tarifaBaseSnapshot?: number | null;
   tarifaPorKmSnapshot?: number | null;
   comisionPctSnapshot?: number | null;
+  kmPagaIngenioSnapshot?: number | null;
 };
 
 // ─── API functions ────────────────────────────────────────────────────────────

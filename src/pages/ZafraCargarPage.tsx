@@ -42,13 +42,15 @@ function asNum(v: string) {
 
 function calcParticulares(params: {
   kmIngenioFinca: number;
+  kmPagaIngenio?: number | null;
   pesoNetoKg: number;
   tarifaBase: number;
   tarifaPorKm: number;
   porcentajeComision: number;
 }) {
-  const { kmIngenioFinca, pesoNetoKg, tarifaBase, tarifaPorKm, porcentajeComision } = params;
-  const valorUnitario = tarifaBase + tarifaPorKm * kmIngenioFinca;
+  const { kmIngenioFinca, kmPagaIngenio, pesoNetoKg, tarifaBase, tarifaPorKm, porcentajeComision } = params;
+  const kmParaFormula = kmPagaIngenio ?? kmIngenioFinca;
+  const valorUnitario = tarifaBase + tarifaPorKm * kmParaFormula;
   const valorTotal = valorUnitario * (pesoNetoKg / 1000);
   const comisionChofer = valorTotal * porcentajeComision;
   return { valorUnitario, valorTotal, comisionChofer };
@@ -69,6 +71,7 @@ export function ZafraCargarPage() {
   const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [lugarId, setLugarId] = useState("");
   const [lugarNombre, setLugarNombre] = useState("");
+  const [kmPagaIngenioSnapshot, setKmPagaIngenioSnapshot] = useState<number | null>(null);
   const [frenteId, setFrenteId] = useState("");
   const [frenteNumero, setFrenteNumero] = useState("");
   const [kmSalida, setKmSalida] = useState("");
@@ -147,12 +150,13 @@ export function ZafraCargarPage() {
     if (modalidad !== "PARTICULARES" || !Number.isFinite(pesoN) || pesoN <= 0) return null;
     return calcParticulares({
       kmIngenioFinca,
+      kmPagaIngenio: kmPagaIngenioSnapshot,
       pesoNetoKg: pesoN,
       tarifaBase: resolvedConfig.tarifaBase,
       tarifaPorKm: resolvedConfig.tarifaPorKm,
       porcentajeComision: resolvedConfig.porcentajeComision,
     });
-  }, [modalidad, kmIngenioFinca, pesoN, resolvedConfig]);
+  }, [modalidad, kmIngenioFinca, kmPagaIngenioSnapshot, pesoN, resolvedConfig]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -202,6 +206,7 @@ export function ZafraCargarPage() {
               tarifaBaseSnapshot: resolvedConfig.tarifaBase,
               tarifaPorKmSnapshot: resolvedConfig.tarifaPorKm,
               comisionPctSnapshot: resolvedConfig.porcentajeComision,
+              kmPagaIngenioSnapshot: kmPagaIngenioSnapshot,
             }
           : {}),
         ...(modalidad === "AMARILLOS"
@@ -313,11 +318,17 @@ export function ZafraCargarPage() {
                 items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
                 value={lugarId}
                 isLoading={lugaresQ.isLoading}
-                onSelect={(id, label) => { setLugarId(id); setLugarNombre(label); }}
+                onSelect={(id, label) => {
+                  setLugarId(id);
+                  setLugarNombre(label);
+                  const lugar = lugaresQ.data?.lugares.find((l) => l.id === id);
+                  setKmPagaIngenioSnapshot(lugar?.kmQuePagaIngenio ?? null);
+                }}
                 onCreate={async (text) => {
                   try {
                     const res = await createLugar({ nombre: text });
                     queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
+                    setKmPagaIngenioSnapshot(res.lugar.kmQuePagaIngenio ?? null);
                     return { id: res.lugar.id, label: res.lugar.nombre };
                   } catch {
                     showToast("Error al crear el lugar", "error");
@@ -404,7 +415,10 @@ export function ZafraCargarPage() {
           {kmRecorridos > 0 && (
             <p className="mt-2 text-xs text-[var(--muted)]">
               Km recorridos: <span className="font-semibold text-[var(--text)]">{kmRecorridos}</span>
-              {" "} · Km ingenio/finca: <span className="font-semibold text-[var(--text)]">{kmIngenioFinca}</span>
+              {" "} · Km real ida: <span className="font-semibold text-[var(--text)]">{kmIngenioFinca}</span>
+              {kmPagaIngenioSnapshot != null && (
+                <> · Km paga ingenio: <span className="font-semibold text-tz-yellow">{kmPagaIngenioSnapshot}</span></>
+              )}
             </p>
           )}
         </Card>
