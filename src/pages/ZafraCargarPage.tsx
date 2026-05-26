@@ -10,9 +10,11 @@ import {
   getZafraConfig,
   getUnidadesActivas,
   uploadZafraFoto,
+  ocrZafraDocumento,
   listMisViajes,
   type ZafraModalidad,
   type ZafraConfig,
+  type ZafraOcrResult,
 } from "../services/zafraApi";
 import { ZafraNav } from "../components/ZafraNav";
 import { Card } from "../components/Card";
@@ -39,7 +41,6 @@ function asNum(v: string) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-
 function calcParticulares(params: {
   kmIngenioFinca: number;
   pesoNetoKg: number;
@@ -59,6 +60,14 @@ const inputCls =
 const readonlyCls =
   "h-11 w-full cursor-not-allowed rounded-2xl border border-white/8 bg-white/5 px-3 flex items-center text-[var(--muted)] text-sm";
 const labelCls = "mb-1 block text-xs text-[var(--muted)]";
+
+function OcrBadge() {
+  return (
+    <span className="ml-1.5 inline-flex items-center rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide bg-tz-yellow/20 text-tz-yellow">
+      Auto
+    </span>
+  );
+}
 
 export function ZafraCargarPage() {
   const { currentDriver } = useAuth();
@@ -80,6 +89,10 @@ export function ZafraCargarPage() {
   const [fotoGasoilUrl, setFotoGasoilUrl] = useState<string | null>(null);
   const [uploadingRemito, setUploadingRemito] = useState(false);
   const [uploadingGasoil, setUploadingGasoil] = useState(false);
+  const [ocrLoadingRemito, setOcrLoadingRemito] = useState(false);
+  const [ocrLoadingOrden, setOcrLoadingOrden] = useState(false);
+  // tracks which fields were auto-filled by OCR
+  const [ocrFilledFields, setOcrFilledFields] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<string[]>([]);
 
   const remitoInputRef = useRef<HTMLInputElement>(null);
@@ -106,7 +119,6 @@ export function ZafraCargarPage() {
     staleTime: 60_000,
   });
 
-  // Auto-fill kmSalida from last viaje of this camion
   const lastViajeQ = useQuery({
     queryKey: ["zafra-last-viaje", currentDriver?.vehicleId],
     queryFn: async () => {
@@ -124,7 +136,6 @@ export function ZafraCargarPage() {
     staleTime: 30_000,
   });
 
-  // Pre-fill kmSalida on first load
   useState(() => {
     const last = lastViajeQ.data;
     if (last && !kmSalida) setKmSalida(String(last.kmLlegada));
@@ -153,6 +164,63 @@ export function ZafraCargarPage() {
       porcentajeComision: resolvedConfig.porcentajeComision,
     });
   }, [modalidad, kmIngenioFinca, pesoN, resolvedConfig]);
+
+  function clearOcr(field: string) {
+    setOcrFilledFields((prev) => {
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+  }
+
+  function applyOcrResult(result: ZafraOcrResult, source: "remito" | "gasoil") {
+    const newFilled = new Set<string>();
+
+    if (source === "remito" && result.pesoNetoKg !== undefined) {
+      setPesoNetoKg(String(result.pesoNetoKg));
+      newFilled.add("pesoNetoKg");
+    }
+    if (source === "gasoil" && result.gasoilLts !== undefined) {
+      setGasoil(String(result.gasoilLts));
+      newFilled.add("gasoil");
+    }
+
+    // Frente: match against existing items, only pre-fill if not already selected
+    if (result.frenteNumero) {
+      const frentes = frentesQ.data?.frentes ?? [];
+      const match = frentes.find(
+        (f) => f.numero.toLowerCase() === result.frenteNumero!.toLowerCase()
+      );
+      if (match && !frenteId) {
+        setFrenteId(match.id);
+        setFrenteNumero(match.numero);
+        newFilled.add("frenteNumero");
+      }
+    }
+
+    // Lugar: match against existing items, only pre-fill if not already selected
+    if (result.lugarNombre) {
+      const lugares = lugaresQ.data?.lugares ?? [];
+      const match = lugares.find((l) =>
+        l.nombre.toLowerCase().includes(result.lugarNombre!.toLowerCase())
+      );
+      if (match && !lugarId) {
+        setLugarId(match.id);
+        setLugarNombre(match.nombre);
+        newFilled.add("lugarNombre");
+      }
+    }
+
+    // Fecha: only update if still at default today
+    if (result.fecha && fecha === todayISO()) {
+      setFecha(result.fecha);
+      newFilled.add("fecha");
+    }
+
+    setOcrFilledFields((prev) => new Set([...prev, ...newFilled]));
+  }
+
+  const ocrBusy = ocrLoadingRemito || ocrLoadingOrden;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -213,7 +281,6 @@ export function ZafraCargarPage() {
     },
     onSuccess: (result) => {
       showToast("Viaje guardado correctamente", "success");
-      // Advance kmSalida to the last kmLlegada
       setKmSalida(String(result.viaje.kmLlegada));
       setKmLlegada("");
       setGasoil("");
@@ -221,6 +288,7 @@ export function ZafraCargarPage() {
       setObservaciones("");
       setFotoRemitoUrl(null);
       setFotoGasoilUrl(null);
+      setOcrFilledFields(new Set());
       setErrors([]);
       queryClient.invalidateQueries({ queryKey: ["zafra"] });
       queryClient.invalidateQueries({ queryKey: ["zafra-last-viaje"] });
@@ -246,7 +314,150 @@ export function ZafraCargarPage() {
       <ZafraNav />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {/* Datos base */}
+
+        {/* ── Documentos del viaje (OCR-first) ──────────────────────── */}
+        <Card>
+          <p className="mb-0.5 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Documentos del viaje
+          </p>
+          <p className="mb-3 text-xs text-[var(--muted)]">
+            Sacá foto a los documentos para completar el formulario automáticamente
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Extracto de Pesaje */}
+            <div className="flex flex-col gap-2">
+              <input
+                ref={remitoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingRemito(true);
+                  try {
+                    const res = await uploadZafraFoto(file, "remito");
+                    setFotoRemitoUrl(res.url);
+                    setOcrLoadingRemito(true);
+                    try {
+                      const ocr = await ocrZafraDocumento(res.url, "extracto_pesaje");
+                      if (ocr.ok && ocr.data) {
+                        applyOcrResult(ocr.data, "remito");
+                        showToast("Datos del extracto detectados", "success");
+                      }
+                    } catch {
+                      showToast("No se pudo leer el extracto automáticamente", "error");
+                    } finally {
+                      setOcrLoadingRemito(false);
+                    }
+                  } catch {
+                    showToast("Error al subir foto del extracto", "error");
+                  } finally {
+                    setUploadingRemito(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+              {fotoRemitoUrl ? (
+                <img
+                  src={fotoRemitoUrl}
+                  alt="Extracto de pesaje"
+                  className="h-24 w-full rounded-xl object-cover border border-white/15"
+                />
+              ) : (
+                <div className="flex h-24 items-center justify-center rounded-xl border-2 border-dashed border-white/15 bg-white/3">
+                  <span className="text-center text-[10px] text-[var(--muted)] px-2">Extracto de Pesaje</span>
+                </div>
+              )}
+              <button
+                type="button"
+                disabled={uploadingRemito || ocrLoadingRemito}
+                onClick={() => remitoInputRef.current?.click()}
+                className="h-9 rounded-xl border border-white/20 bg-white/5 px-2 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition-all"
+              >
+                {ocrLoadingRemito
+                  ? "Leyendo..."
+                  : uploadingRemito
+                  ? "Subiendo..."
+                  : fotoRemitoUrl
+                  ? "Cambiar"
+                  : "📷 Extracto"}
+              </button>
+            </div>
+
+            {/* Orden de Carga */}
+            <div className="flex flex-col gap-2">
+              <input
+                ref={gasoilInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingGasoil(true);
+                  try {
+                    const res = await uploadZafraFoto(file, "gasoil");
+                    setFotoGasoilUrl(res.url);
+                    setOcrLoadingOrden(true);
+                    try {
+                      const ocr = await ocrZafraDocumento(res.url, "orden_carga");
+                      if (ocr.ok && ocr.data) {
+                        applyOcrResult(ocr.data, "gasoil");
+                        showToast("Datos de la orden detectados", "success");
+                      }
+                    } catch {
+                      showToast("No se pudo leer la orden automáticamente", "error");
+                    } finally {
+                      setOcrLoadingOrden(false);
+                    }
+                  } catch {
+                    showToast("Error al subir foto de la orden", "error");
+                  } finally {
+                    setUploadingGasoil(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+              {fotoGasoilUrl ? (
+                <img
+                  src={fotoGasoilUrl}
+                  alt="Orden de carga"
+                  className="h-24 w-full rounded-xl object-cover border border-white/15"
+                />
+              ) : (
+                <div className="flex h-24 items-center justify-center rounded-xl border-2 border-dashed border-white/15 bg-white/3">
+                  <span className="text-center text-[10px] text-[var(--muted)] px-2">Orden de Carga</span>
+                </div>
+              )}
+              <button
+                type="button"
+                disabled={uploadingGasoil || ocrLoadingOrden}
+                onClick={() => gasoilInputRef.current?.click()}
+                className="h-9 rounded-xl border border-white/20 bg-white/5 px-2 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition-all"
+              >
+                {ocrLoadingOrden
+                  ? "Leyendo..."
+                  : uploadingGasoil
+                  ? "Subiendo..."
+                  : fotoGasoilUrl
+                  ? "Cambiar"
+                  : "📷 Orden"}
+              </button>
+            </div>
+          </div>
+
+          {ocrBusy && (
+            <p className="mt-3 text-xs text-tz-yellow animate-pulse">
+              Detectando datos del documento...
+            </p>
+          )}
+        </Card>
+
+        {/* ── Datos del viaje ───────────────────────────────────────── */}
         <Card>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Datos del viaje
@@ -264,17 +475,19 @@ export function ZafraCargarPage() {
               </select>
             </div>
             <div>
-              <label className={labelCls}>Fecha</label>
+              <label className={labelCls}>
+                Fecha
+                {ocrFilledFields.has("fecha") && <OcrBadge />}
+              </label>
               <input
                 type="date"
                 value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className={inputCls}
+                onChange={(e) => { setFecha(e.target.value); clearOcr("fecha"); }}
+                className={`${inputCls} ${ocrFilledFields.has("fecha") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
               />
             </div>
           </div>
 
-          {/* Chofer y camión */}
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Chofer</label>
@@ -301,19 +514,27 @@ export function ZafraCargarPage() {
           </div>
         </Card>
 
-        {/* Lugar y frente */}
+        {/* ── Lugar y frente ────────────────────────────────────────── */}
         <Card>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Lugar y frente
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Lugar</label>
+              <label className={labelCls}>
+                Lugar
+                {ocrFilledFields.has("lugarNombre") && <OcrBadge />}
+              </label>
               <CreatableCombobox
                 items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
                 value={lugarId}
                 isLoading={lugaresQ.isLoading}
-                onSelect={(id, label) => { setLugarId(id); setLugarNombre(label); }}
+                className={`${inputCls.replace("focus:ring-tz-yellow/60", "focus:ring-tz-yellow/60")} ${ocrFilledFields.has("lugarNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                onSelect={(id, label) => {
+                  setLugarId(id);
+                  setLugarNombre(label);
+                  if (id) clearOcr("lugarNombre");
+                }}
                 onCreate={async (text) => {
                   try {
                     const res = await createLugar({ nombre: text });
@@ -327,12 +548,20 @@ export function ZafraCargarPage() {
               />
             </div>
             <div>
-              <label className={labelCls}>Frente</label>
+              <label className={labelCls}>
+                Frente
+                {ocrFilledFields.has("frenteNumero") && <OcrBadge />}
+              </label>
               <CreatableCombobox
                 items={(frentesQ.data?.frentes ?? []).map((f) => ({ id: f.id, label: f.numero }))}
                 value={frenteId}
                 isLoading={frentesQ.isLoading}
-                onSelect={(id, label) => { setFrenteId(id); setFrenteNumero(label); }}
+                className={`${inputCls.replace("focus:ring-tz-yellow/60", "focus:ring-tz-yellow/60")} ${ocrFilledFields.has("frenteNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                onSelect={(id, label) => {
+                  setFrenteId(id);
+                  setFrenteNumero(label);
+                  if (id) clearOcr("frenteNumero");
+                }}
                 onCreate={async (text) => {
                   try {
                     const res = await createFrente({ numero: text });
@@ -348,7 +577,7 @@ export function ZafraCargarPage() {
           </div>
         </Card>
 
-        {/* Odómetro y carga */}
+        {/* ── Odómetro y carga ─────────────────────────────────────── */}
         <Card>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Odómetro y carga
@@ -375,28 +604,34 @@ export function ZafraCargarPage() {
               />
             </div>
             <div>
-              <label className={labelCls}>Gasoil (L)</label>
+              <label className={labelCls}>
+                Gasoil (L)
+                {ocrFilledFields.has("gasoil") && <OcrBadge />}
+              </label>
               <input
                 type="number"
                 min="0"
                 step="0.1"
                 value={gasoil}
-                onChange={(e) => setGasoil(e.target.value)}
+                onChange={(e) => { setGasoil(e.target.value); clearOcr("gasoil"); }}
                 placeholder="0"
-                className={inputCls}
+                className={`${inputCls} ${ocrFilledFields.has("gasoil") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
               />
             </div>
             {modalidad === "PARTICULARES" && (
               <div>
-                <label className={labelCls}>Peso Neto (Kg) *</label>
+                <label className={labelCls}>
+                  Peso Neto (Kg) *
+                  {ocrFilledFields.has("pesoNetoKg") && <OcrBadge />}
+                </label>
                 <input
                   type="number"
                   min="0"
                   step="1"
                   value={pesoNetoKg}
-                  onChange={(e) => setPesoNetoKg(e.target.value)}
+                  onChange={(e) => { setPesoNetoKg(e.target.value); clearOcr("pesoNetoKg"); }}
                   placeholder="0"
-                  className={inputCls}
+                  className={`${inputCls} ${ocrFilledFields.has("pesoNetoKg") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
                 />
               </div>
             )}
@@ -409,7 +644,7 @@ export function ZafraCargarPage() {
           )}
         </Card>
 
-        {/* Comisión en tiempo real — solo para PARTICULARES */}
+        {/* ── Comisión estimada ─────────────────────────────────────── */}
         {modalidad === "PARTICULARES" && calcs && (
           <Card className="border-tz-yellow/20 bg-[rgba(240,199,95,0.04)]">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-tz-yellow">
@@ -421,101 +656,7 @@ export function ZafraCargarPage() {
           </Card>
         )}
 
-        {/* Documentación */}
-        <Card>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Documentación
-          </p>
-          <div className="flex flex-col gap-3">
-            {/* Foto Remito */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-sm text-[var(--text)]">Foto de Remito <span className="text-xs text-[var(--muted)]">(opcional)</span></p>
-              </div>
-              <input
-                ref={remitoInputRef}
-                type="file"
-                accept="image/*"
-                
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploadingRemito(true);
-                  try {
-                    const res = await uploadZafraFoto(file, "remito");
-                    setFotoRemitoUrl(res.url);
-                  } catch {
-                    showToast("Error al subir foto de remito", "error");
-                  } finally {
-                    setUploadingRemito(false);
-                    e.target.value = "";
-                  }
-                }}
-              />
-              {fotoRemitoUrl && (
-                <img
-                  src={fotoRemitoUrl}
-                  alt="Remito"
-                  className="h-10 w-10 rounded-lg object-cover border border-white/15"
-                />
-              )}
-              <button
-                type="button"
-                disabled={uploadingRemito}
-                onClick={() => remitoInputRef.current?.click()}
-                className="h-9 rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition-all"
-              >
-                {uploadingRemito ? "Subiendo..." : fotoRemitoUrl ? "Cambiar" : "📷 Subir"}
-              </button>
-            </div>
-
-            {/* Foto Gasoil */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-sm text-[var(--text)]">Foto de Gasoil <span className="text-xs text-[var(--muted)]">(opcional)</span></p>
-              </div>
-              <input
-                ref={gasoilInputRef}
-                type="file"
-                accept="image/*"
-                
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploadingGasoil(true);
-                  try {
-                    const res = await uploadZafraFoto(file, "gasoil");
-                    setFotoGasoilUrl(res.url);
-                  } catch {
-                    showToast("Error al subir foto de gasoil", "error");
-                  } finally {
-                    setUploadingGasoil(false);
-                    e.target.value = "";
-                  }
-                }}
-              />
-              {fotoGasoilUrl && (
-                <img
-                  src={fotoGasoilUrl}
-                  alt="Gasoil"
-                  className="h-10 w-10 rounded-lg object-cover border border-white/15"
-                />
-              )}
-              <button
-                type="button"
-                disabled={uploadingGasoil}
-                onClick={() => gasoilInputRef.current?.click()}
-                className="h-9 rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition-all"
-              >
-                {uploadingGasoil ? "Subiendo..." : fotoGasoilUrl ? "Cambiar" : "📷 Subir"}
-              </button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Observaciones */}
+        {/* ── Observaciones ─────────────────────────────────────────── */}
         <Card>
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Observaciones
@@ -543,10 +684,10 @@ export function ZafraCargarPage() {
 
         <button
           type="submit"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || ocrBusy}
           className="h-12 w-full rounded-xl bg-tz-yellow font-semibold text-tz-black hover:brightness-105 disabled:opacity-60 disabled:pointer-events-none transition-all"
         >
-          {mutation.isPending ? "Guardando..." : "Guardar viaje"}
+          {mutation.isPending ? "Guardando..." : ocrBusy ? "Leyendo documentos..." : "Guardar viaje"}
         </button>
       </form>
     </div>
