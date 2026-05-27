@@ -198,6 +198,7 @@ export function ZafraCargarPage() {
         observaciones: observaciones.trim() || null,
         fotoRemitoUrl: fotoRemitoUrl || null,
         fotoGasoilUrl: fotoGasoilUrl || null,
+        kmPagaIngenioSnapshot: kmPagaIngenioSnapshot,
         ...(calcs
           ? {
               valorUnitarioARS: calcs.valorUnitario,
@@ -206,7 +207,6 @@ export function ZafraCargarPage() {
               tarifaBaseSnapshot: resolvedConfig.tarifaBase,
               tarifaPorKmSnapshot: resolvedConfig.tarifaPorKm,
               comisionPctSnapshot: resolvedConfig.porcentajeComision,
-              kmPagaIngenioSnapshot: kmPagaIngenioSnapshot,
             }
           : {}),
         ...(modalidad === "AMARILLOS"
