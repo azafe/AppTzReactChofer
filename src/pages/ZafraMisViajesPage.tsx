@@ -62,45 +62,71 @@ export function ZafraMisViajesPage() {
       )}
 
       <div className="flex flex-col gap-3">
-        {viajes.map((v) => (
-          <Card key={v.id}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-semibold text-[var(--text)]">{dateAR(v.fecha)}</p>
-                <p className="mt-0.5 text-xs text-[var(--muted)]">
-                  {v.camionNombre || currentDriver?.vehicleLabel}
+        {viajes.map((v, idx) => {
+          const kmEfectivo = v.kmPagaIngenioSnapshot ?? v.kmIngenioFinca;
+          return (
+            <Card key={v.id}>
+              {/* Línea 1: # fecha | comisión */}
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold text-[var(--text)]">
+                  <span className="text-tz-yellow font-bold mr-1">#{viajes.length - idx}</span>
+                  {dateAR(v.fecha)}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
-                  <span>
-                    Km: {v.kmSalida} → {v.kmLlegada}
-                    <span className="ml-1 text-[var(--text)]">({v.kmRecorridos} km)</span>
-                  </span>
-                  {v.pesoNetoKg != null && (
-                    <span>Peso: {v.pesoNetoKg.toLocaleString("es-AR")} kg</span>
+                <div className="text-right shrink-0">
+                  {v.comisionChofer != null ? (
+                    <>
+                      <p className="font-display text-xl font-bold text-tz-yellow leading-tight">
+                        {moneyARS(v.comisionChofer)}
+                      </p>
+                      {v.modalidad === "AMARILLOS" && (
+                      <p className="text-xs text-[var(--muted)]">pago viaje</p>
+                    )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-[var(--muted)]">—</p>
                   )}
-                  {v.lugarNombre && <span>{v.lugarNombre}</span>}
                 </div>
-                <p className="mt-1 text-xs text-[var(--muted)] capitalize">
-                  {v.modalidad.toLowerCase()}
+              </div>
+
+              {/* Línea 2: modalidad · camión */}
+              <p className="mt-0.5 text-xs text-[var(--muted)] capitalize">
+                {v.modalidad.toLowerCase()} · {v.camionNombre || currentDriver?.vehicleLabel}
+              </p>
+
+              {/* Línea 3: lugar · frente */}
+              {(v.lugarNombre || v.frenteNumero) && (
+                <p className="mt-0.5 text-xs text-[var(--muted)]">
+                  {[v.lugarNombre, v.frenteNumero ? `Frente ${v.frenteNumero}` : null]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
+              )}
+
+              {/* Línea 4: km odómetro | km ingenio | gasoil */}
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--muted)]">
+                <span>
+                  Km: {v.kmSalida} → {v.kmLlegada}
+                  <span className="ml-1 text-[var(--text)]">({v.kmRecorridos} km)</span>
+                </span>
+                <span className="text-[var(--muted)]">|</span>
+                <span>
+                  Ing: <span className="text-[var(--text)]">{kmEfectivo} km</span>
+                </span>
+                <span className="text-[var(--muted)]">|</span>
+                <span>
+                  Gasoil: <span className="text-[var(--text)]">{v.gasoil} L</span>
+                </span>
               </div>
-              <div className="text-right shrink-0">
-                {v.comisionChofer != null ? (
-                  <>
-                    <p className="font-display text-xl font-bold text-tz-yellow">
-                      {moneyARS(v.comisionChofer)}
-                    </p>
-                    <p className="text-xs text-[var(--muted)]">
-                      {v.modalidad === "AMARILLOS" ? "pago viaje" : "comisión"}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-sm text-[var(--muted)]">—</p>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
+
+              {/* Línea 5: peso */}
+              {v.pesoNetoKg != null && (
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Peso: <span className="text-[var(--text)]">{v.pesoNetoKg.toLocaleString("es-AR")} kg</span>
+                </p>
+              )}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
