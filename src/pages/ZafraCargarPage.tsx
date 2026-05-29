@@ -276,7 +276,7 @@ export function ZafraCargarPage() {
         observaciones: observaciones.trim() || null,
         fotoRemitoUrl: fotoRemitoUrl || null,
         fotoGasoilUrl: fotoGasoilUrl || null,
-        kmPagaIngenioSnapshot: kmPagaIngenioSnapshot,
+        kmPagaIngenioSnapshot: lugarKmPagaIngenio ?? undefined,
         ...(calcs
           ? {
               valorUnitarioARS: calcs.valorUnitario,
