@@ -147,3 +147,19 @@ export async function uploadZafraFoto(
   fd.append("tipo", tipo);
   return apiPostForm("/registro-viajes/upload-foto", fd);
 }
+
+export type ZafraOcrResult = {
+  pesoNetoKg?: number;
+  gasoilLts?: number;
+  frenteNumero?: string;
+  lugarNombre?: string;
+  ingenioNombre?: string;
+  fecha?: string;
+};
+
+export async function ocrZafraDocumento(
+  url: string,
+  tipo: "extracto_pesaje" | "orden_carga"
+): Promise<{ ok: boolean; data: ZafraOcrResult }> {
+  return apiPost("/registro-viajes/ocr", { url, tipo });
+}
