@@ -35,7 +35,7 @@ export type ZafraViaje = {
   updatedAt?: string | null;
 };
 
-export type ZafraLugar = { id: string; nombre: string };
+export type ZafraLugar = { id: string; nombre: string; kmQuePagaIngenio?: number | null };
 export type ZafraFrente = { id: string; numero: string; nombre?: string | null };
 export type ZafraCamion = { vehicleId: string; vehicleLabel: string };
 
@@ -151,6 +151,7 @@ export type ZafraOcrResult = {
   gasoilLts?: number;
   frenteNumero?: string;
   lugarNombre?: string;
+  ingenioNombre?: string;
   fecha?: string;
 };
 
