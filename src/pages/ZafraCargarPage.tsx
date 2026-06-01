@@ -226,8 +226,11 @@ export function ZafraCargarPage() {
     }
 
     if (result.fecha && fecha === todayISO()) {
-      setFecha(result.fecha);
-      newFilled.add("fecha");
+      const year = parseInt(result.fecha.slice(0, 4), 10);
+      if (year >= 2024 && year <= 2030) {
+        setFecha(result.fecha);
+        newFilled.add("fecha");
+      }
     }
 
     setOcrFilledFields((prev) => new Set([...prev, ...newFilled]));
