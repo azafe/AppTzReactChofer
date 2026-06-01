@@ -227,7 +227,7 @@ export function ZafraCargarPage() {
 
     if (result.fecha && fecha === todayISO()) {
       const year = parseInt(result.fecha.slice(0, 4), 10);
-      if (year >= 2024 && year <= 2030) {
+      if (year >= 2025 && year <= 2030) {
         setFecha(result.fecha);
         newFilled.add("fecha");
       }
