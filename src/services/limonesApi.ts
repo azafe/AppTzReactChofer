@@ -36,7 +36,7 @@ export type LimonCarga = {
   camionNombre: string;
   litros: number;
   tanqueInicial: number | null;
-  kmOdometro: number;
+  kmOdometro: number | null;
   origen: LimonCombustibleOrigen;
   observaciones?: string | null;
   fotoRemitoUrl?: string | null;
@@ -62,7 +62,7 @@ export type LimonViajeBody = {
   es_vacio?: boolean;
 };
 
-export type LimonCamion = { vehicleId: string; vehicleLabel: string; consumo_teorico_l100km?: number | null };
+export type LimonCamion = { vehicleId: string; vehicleLabel: string; consumo_teorico_l100km?: number | null; tieneOdometro?: boolean };
 
 export async function listMisViajesLimones(params: {
   choferId: string;
@@ -94,7 +94,7 @@ export async function createLimonCarga(body: {
   camionNombre: string;
   litros: number;
   tanqueInicial: number | null;
-  kmOdometro: number;
+  kmOdometro: number | null;
   origen: LimonCombustibleOrigen;
   observaciones?: string | null;
   fotoRemitoUrl?: string | null;

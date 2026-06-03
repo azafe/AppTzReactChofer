@@ -57,6 +57,9 @@ function NuevaCargaModal({
     setCamionNombre(u?.vehicleLabel ?? "");
   }
 
+  const selectedUnidad = unidades.find((u) => u.vehicleId === camionVehicleId);
+  const requiereOdometro = selectedUnidad?.tieneOdometro !== false;
+
   const mutation = useMutation({
     mutationFn: async () => {
       const errs: string[] = [];
@@ -64,10 +67,14 @@ function NuevaCargaModal({
       if (!camionVehicleId) errs.push("Seleccioná un camión.");
       const l = parseFloat(litros);
       if (!litros || !Number.isFinite(l) || l <= 0) errs.push("Ingresá los litros cargados.");
-      const km = parseFloat(kmOdometro);
-      if (!kmOdometro || !Number.isFinite(km) || km < 0) errs.push("Ingresá el km del odómetro.");
+      if (requiereOdometro) {
+        const km = parseFloat(kmOdometro);
+        if (!kmOdometro || !Number.isFinite(km) || km < 0) errs.push("Ingresá el km del odómetro.");
+      }
       if (errs.length > 0) { setErrors(errs); throw new Error(errs[0]); }
       setErrors([]);
+
+      const kmVal = kmOdometro ? parseFloat(kmOdometro) : null;
 
       await createLimonCarga({
         fecha,
@@ -77,7 +84,7 @@ function NuevaCargaModal({
         camionNombre,
         litros: l,
         tanqueInicial: null,
-        kmOdometro: km,
+        kmOdometro: requiereOdometro ? kmVal : null,
         origen,
         observaciones: observaciones.trim() || null,
         fotoRemitoUrl: fotoUrl || null,
@@ -146,7 +153,7 @@ function NuevaCargaModal({
               />
             </div>
             <div>
-              <label className={labelCls}>Km odómetro *</label>
+              <label className={labelCls}>Km odómetro {requiereOdometro ? "*" : "(opcional)"}</label>
               <input
                 type="number"
                 min="0"
@@ -370,7 +377,7 @@ function CargaCard({
               )}
             </span>
             <span>{carga.origen === "BASE_TZ" ? "Base TZ" : "Ext."}</span>
-            <span>{carga.kmOdometro} km</span>
+            {carga.kmOdometro != null && <span>{carga.kmOdometro} km</span>}
           </div>
         </div>
         <div className="shrink-0 text-right">

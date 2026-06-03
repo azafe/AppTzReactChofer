@@ -151,6 +151,9 @@ export function ZafraCargarPage() {
   const unidades = unidadesQ.data?.unidades ?? [];
   const resolvedConfig = config.particulares;
 
+  const selectedUnidad = unidades.find((u) => u.vehicleId === camionVehicleId);
+  const requiereOdometro = selectedUnidad?.tieneOdometro !== false;
+
   const kmSalidaN = asNum(kmSalida);
   const kmLlegadaN = asNum(kmLlegada);
   const kmRecorridos =
@@ -241,12 +244,14 @@ export function ZafraCargarPage() {
   const mutation = useMutation({
     mutationFn: async () => {
       const errs: string[] = [];
-      if (!kmSalida) errs.push("KmSalida es obligatorio.");
-      if (!kmLlegada) errs.push("KmLlegada es obligatorio.");
-      const kmS = asNum(kmSalida);
-      const kmL = asNum(kmLlegada);
-      if (Number.isFinite(kmS) && Number.isFinite(kmL) && kmL <= kmS)
-        errs.push("KmLlegada debe ser mayor que KmSalida.");
+      if (requiereOdometro) {
+        if (!kmSalida) errs.push("KmSalida es obligatorio.");
+        if (!kmLlegada) errs.push("KmLlegada es obligatorio.");
+        const kmS = asNum(kmSalida);
+        const kmL = asNum(kmLlegada);
+        if (Number.isFinite(kmS) && Number.isFinite(kmL) && kmL <= kmS)
+          errs.push("KmLlegada debe ser mayor que KmSalida.");
+      }
       if (modalidad === "PARTICULARES") {
         const p = asNum(pesoNetoKg);
         if (!Number.isFinite(p) || p <= 0) errs.push("PesoNetoKg debe ser mayor a 0 para Particulares.");
@@ -271,8 +276,8 @@ export function ZafraCargarPage() {
         lugarNombre: lugarNombre || null,
         frenteId: frenteId || null,
         frenteNumero: frenteNumero || null,
-        kmSalida: kmS,
-        kmLlegada: kmL,
+        kmSalida: requiereOdometro && kmSalida ? asNum(kmSalida) : null,
+        kmLlegada: requiereOdometro && kmLlegada ? asNum(kmLlegada) : null,
         gasoil: gasoilN,
         pesoNetoKg: modalidad === "PARTICULARES" ? pesoN : null,
         ingenioNombre: ingenioNombre || null,
@@ -301,7 +306,7 @@ export function ZafraCargarPage() {
     onSuccess: (result) => {
       showToast("Viaje guardado correctamente", "success");
       setStep("docs");
-      setKmSalida(String(result.viaje.kmLlegada));
+      setKmSalida(result.viaje.kmLlegada != null ? String(result.viaje.kmLlegada) : "");
       setKmLlegada("");
       setGasoil("");
       setPesoNetoKg("");
@@ -557,7 +562,7 @@ export function ZafraCargarPage() {
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Km Salida *</label>
+              <label className={labelCls}>Km Salida {requiereOdometro ? "*" : "(opcional)"}</label>
               <input
                 type="number"
                 value={kmSalida}
@@ -567,7 +572,7 @@ export function ZafraCargarPage() {
               />
             </div>
             <div>
-              <label className={labelCls}>Km Llegada *</label>
+              <label className={labelCls}>Km Llegada {requiereOdometro ? "*" : "(opcional)"}</label>
               <input
                 type="number"
                 value={kmLlegada}

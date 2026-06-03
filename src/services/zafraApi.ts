@@ -16,9 +16,9 @@ export type ZafraViaje = {
   lugarNombre?: string | null;
   frenteId?: string | null;
   frenteNumero?: string | null;
-  kmSalida: number;
-  kmLlegada: number;
-  kmRecorridos: number;
+  kmSalida: number | null;
+  kmLlegada: number | null;
+  kmRecorridos: number | null;
   kmIngenioFinca: number;
   gasoil: number;
   pesoNetoKg?: number | null;
@@ -38,7 +38,7 @@ export type ZafraViaje = {
 
 export type ZafraLugar = { id: string; nombre: string; kmQuePagaIngenio?: number | null };
 export type ZafraFrente = { id: string; numero: string; nombre?: string | null };
-export type ZafraCamion = { vehicleId: string; vehicleLabel: string };
+export type ZafraCamion = { vehicleId: string; vehicleLabel: string; tieneOdometro?: boolean };
 
 export type ZafraConfig = {
   particulares: {
@@ -65,8 +65,8 @@ export type ZafraViajeBody = {
   lugarNombre?: string | null;
   frenteId?: string | null;
   frenteNumero?: string | null;
-  kmSalida: number;
-  kmLlegada: number;
+  kmSalida: number | null;
+  kmLlegada: number | null;
   gasoil: number;
   pesoNetoKg?: number | null;
   observaciones?: string | null;
