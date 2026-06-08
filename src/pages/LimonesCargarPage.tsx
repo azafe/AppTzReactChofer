@@ -35,6 +35,7 @@ export function LimonesCargarPage() {
   const [uploadingRemito, setUploadingRemito] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const remitoInputRef = useRef<HTMLInputElement>(null);
+  const remitoGaleriaRef = useRef<HTMLInputElement>(null);
 
   const unidadesQ = useQuery({
     queryKey: ["limones-unidades"],
@@ -329,44 +330,83 @@ export function LimonesCargarPage() {
         {/* Foto */}
         <Card>
           <label className={labelCls}>Foto remito (opcional)</label>
-          <div className="flex items-center gap-3">
-            <input
-              ref={remitoInputRef}
-              type="file"
-              accept="image/*"
-              
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                setUploadingRemito(true);
-                try {
-                  const res = await uploadLimonesFoto(file, "limones-remito");
-                  setFotoRemitoUrl(res.url);
-                } catch {
-                  showToast("Error al subir la foto", "error");
-                } finally {
-                  setUploadingRemito(false);
-                  e.target.value = "";
-                }
-              }}
-            />
-            {fotoRemitoUrl && (
+          <input
+            ref={remitoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setUploadingRemito(true);
+              try {
+                const res = await uploadLimonesFoto(file, "limones-remito");
+                setFotoRemitoUrl(res.url);
+              } catch {
+                showToast("Error al subir la foto", "error");
+              } finally {
+                setUploadingRemito(false);
+                e.target.value = "";
+              }
+            }}
+          />
+          <input
+            ref={remitoGaleriaRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setUploadingRemito(true);
+              try {
+                const res = await uploadLimonesFoto(file, "limones-remito");
+                setFotoRemitoUrl(res.url);
+              } catch {
+                showToast("Error al subir la foto", "error");
+              } finally {
+                setUploadingRemito(false);
+                e.target.value = "";
+              }
+            }}
+          />
+          {fotoRemitoUrl ? (
+            <div className="flex items-center gap-3">
               <img
                 src={fotoRemitoUrl}
                 alt="Remito"
                 className="h-10 w-10 rounded-lg border border-white/15 object-cover"
               />
-            )}
-            <button
-              type="button"
-              disabled={uploadingRemito}
-              onClick={() => remitoInputRef.current?.click()}
-              className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
-            >
-              {uploadingRemito ? "Subiendo..." : fotoRemitoUrl ? "Cambiar foto" : "Subir foto remito"}
-            </button>
-          </div>
+              <button
+                type="button"
+                disabled={uploadingRemito}
+                onClick={() => remitoInputRef.current?.click()}
+                className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+              >
+                {uploadingRemito ? "Subiendo..." : "Cambiar foto"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={uploadingRemito}
+                onClick={() => remitoInputRef.current?.click()}
+                className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+              >
+                {uploadingRemito ? "Subiendo..." : "Camara"}
+              </button>
+              <button
+                type="button"
+                disabled={uploadingRemito}
+                onClick={() => remitoGaleriaRef.current?.click()}
+                className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+              >
+                Galeria
+              </button>
+            </div>
+          )}
         </Card>
 
         {/* Observaciones */}

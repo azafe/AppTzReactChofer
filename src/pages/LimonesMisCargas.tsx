@@ -43,6 +43,7 @@ function NuevaCargaModal({
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const fotoInputRef = useRef<HTMLInputElement>(null);
+  const fotoGaleriaRef = useRef<HTMLInputElement>(null);
 
   const unidadesQ = useQuery({
     queryKey: ["limones-unidades"],
@@ -188,44 +189,83 @@ function NuevaCargaModal({
 
           <div>
             <label className={labelCls}>Foto ticket (opcional)</label>
-            <div className="flex items-center gap-3">
-              <input
-                ref={fotoInputRef}
-                type="file"
-                accept="image/*"
-                
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploading(true);
-                  try {
-                    const res = await uploadLimonesFoto(file, "limones-gasoil");
-                    setFotoUrl(res.url);
-                  } catch {
-                    showToast("Error al subir la foto", "error");
-                  } finally {
-                    setUploading(false);
-                    e.target.value = "";
-                  }
-                }}
-              />
-              {fotoUrl && (
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                try {
+                  const res = await uploadLimonesFoto(file, "limones-gasoil");
+                  setFotoUrl(res.url);
+                } catch {
+                  showToast("Error al subir la foto", "error");
+                } finally {
+                  setUploading(false);
+                  e.target.value = "";
+                }
+              }}
+            />
+            <input
+              ref={fotoGaleriaRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                try {
+                  const res = await uploadLimonesFoto(file, "limones-gasoil");
+                  setFotoUrl(res.url);
+                } catch {
+                  showToast("Error al subir la foto", "error");
+                } finally {
+                  setUploading(false);
+                  e.target.value = "";
+                }
+              }}
+            />
+            {fotoUrl ? (
+              <div className="flex items-center gap-3">
                 <img
                   src={fotoUrl}
                   alt="Ticket"
                   className="h-10 w-10 rounded-lg border border-white/15 object-cover"
                 />
-              )}
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={() => fotoInputRef.current?.click()}
-                className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
-              >
-                {uploading ? "Subiendo..." : fotoUrl ? "Cambiar foto" : "Subir foto ticket"}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fotoInputRef.current?.click()}
+                  className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+                >
+                  {uploading ? "Subiendo..." : "Cambiar foto"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fotoInputRef.current?.click()}
+                  className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+                >
+                  {uploading ? "Subiendo..." : "Camara"}
+                </button>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fotoGaleriaRef.current?.click()}
+                  className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+                >
+                  Galeria
+                </button>
+              </div>
+            )}
           </div>
 
           <div>
@@ -350,6 +390,7 @@ function CargaCard({
   onFotoUpdated: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const galeriaRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   const mutation = useMutation({
@@ -392,7 +433,27 @@ function CargaCard({
           ref={inputRef}
           type="file"
           accept="image/*"
-          
+          capture="environment"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setUploading(true);
+            try {
+              const res = await uploadLimonesFoto(file, "limones-gasoil");
+              mutation.mutate(res.url);
+            } catch {
+              showToast("Error al subir la foto", "error");
+            } finally {
+              setUploading(false);
+              e.target.value = "";
+            }
+          }}
+        />
+        <input
+          ref={galeriaRef}
+          type="file"
+          accept="image/*"
           className="hidden"
           onChange={async (e) => {
             const file = e.target.files?.[0];
@@ -428,14 +489,24 @@ function CargaCard({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            disabled={uploading || mutation.isPending}
-            onClick={() => inputRef.current?.click()}
-            className="h-11 w-full rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
-          >
-            {uploading || mutation.isPending ? "Subiendo..." : "Subir foto ticket"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={uploading || mutation.isPending}
+              onClick={() => inputRef.current?.click()}
+              className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+            >
+              {uploading || mutation.isPending ? "Subiendo..." : "Camara"}
+            </button>
+            <button
+              type="button"
+              disabled={uploading || mutation.isPending}
+              onClick={() => galeriaRef.current?.click()}
+              className="h-11 flex-1 rounded-2xl border border-white/15 bg-[#0f1115] text-sm text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-50"
+            >
+              Galeria
+            </button>
+          </div>
         )}
       </div>
     </Card>
