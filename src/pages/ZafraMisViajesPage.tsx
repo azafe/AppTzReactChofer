@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
-import { listMisViajes } from "../services/zafraApi";
+import { listMisViajes, type ZafraViaje } from "../services/zafraApi";
 import { ZafraNav } from "../components/ZafraNav";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard, EmptyState } from "../components/Spinner";
 import { moneyARS, dateAR, monthRange } from "../lib/format";
+import { ZafraViajeModal } from "../components/ZafraViajeModal";
 
 export function ZafraMisViajesPage() {
   const { currentDriver } = useAuth();
+  const queryClient = useQueryClient();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [selectedViaje, setSelectedViaje] = useState<ZafraViaje | null>(null);
 
   const { from, to } = monthRange(year, month);
 
@@ -65,7 +68,8 @@ export function ZafraMisViajesPage() {
         {viajes.map((v, idx) => {
           const kmEfectivo = v.kmPagaIngenioSnapshot ?? v.kmIngenioFinca;
           return (
-            <Card key={v.id}>
+            <div key={v.id} onClick={() => setSelectedViaje(v)} className="cursor-pointer">
+            <Card className="hover:border-white/20 transition-colors">
               {/* Línea 1: # fecha | comisión */}
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-[var(--text)]">
@@ -125,9 +129,25 @@ export function ZafraMisViajesPage() {
                 </p>
               )}
             </Card>
+            </div>
           );
         })}
       </div>
+
+      {selectedViaje && (
+        <ZafraViajeModal
+          viaje={selectedViaje}
+          onClose={() => setSelectedViaje(null)}
+          onUpdated={() => {
+            queryClient.invalidateQueries({ queryKey: ["zafra"] });
+            setSelectedViaje(null);
+          }}
+          onDeleted={() => {
+            queryClient.invalidateQueries({ queryKey: ["zafra"] });
+            setSelectedViaje(null);
+          }}
+        />
+      )}
     </div>
   );
 }

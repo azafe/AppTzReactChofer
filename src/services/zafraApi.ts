@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPostForm, apiPut } from "../lib/http";
+import { apiGet, apiPost, apiPostForm, apiPut, apiDelete } from "../lib/http";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -108,6 +108,10 @@ export async function updateZafraViaje(
   body: Partial<ZafraViajeBody>
 ): Promise<{ ok: boolean; viaje: ZafraViaje }> {
   return apiPut(`/registro-viajes/${id}`, body);
+}
+
+export async function deleteZafraViaje(id: string): Promise<{ ok: boolean }> {
+  return apiDelete(`/registro-viajes/${id}`);
 }
 
 export async function getLugares(): Promise<{ ok: boolean; lugares: ZafraLugar[] }> {
