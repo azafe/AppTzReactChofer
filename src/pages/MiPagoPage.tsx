@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { getSheets, getAnticipos } from "../services/picadoApi";
 import { listMisViajesLimones } from "../services/limonesApi";
+import { listMisViajes, getZafraConfig, listMisAmarillosDias } from "../services/zafraApi";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard } from "../components/Spinner";
@@ -19,6 +20,7 @@ export function MiPagoPage() {
 
   const hasPicado = modulos.includes("PICADO");
   const hasLimones = modulos.includes("LIMONES");
+  const hasZafra = modulos.includes("ZAFRA");
 
   const sheetsQuery = useQuery({
     queryKey: ["picado", "sheets", currentDriver?.id, { from, to, limit: 200 }],
@@ -41,32 +43,74 @@ export function MiPagoPage() {
     staleTime: 60_000,
   });
 
-  const sheets = sheetsQuery.data?.data ?? [];
-  const anticipos = anticiposQuery.data ?? [];
-  const limonesViajes = limonesQ.data?.viajes ?? [];
+  const zafraViajesQ = useQuery({
+    queryKey: ["zafra", "mis-viajes", currentDriver?.id, { from, to }],
+    queryFn: () => listMisViajes({ choferId: currentDriver!.id, from, to }),
+    enabled: !!currentDriver && hasZafra,
+    staleTime: 60_000,
+  });
 
+  const zafraConfigQ = useQuery({
+    queryKey: ["zafra-config"],
+    queryFn: getZafraConfig,
+    enabled: hasZafra,
+    staleTime: 300_000,
+  });
+
+  const amarillosDiasQ = useQuery({
+    queryKey: ["amarillos-dias", currentDriver?.id, { from, to }],
+    queryFn: () => listMisAmarillosDias({ choferId: currentDriver!.id, from, to }),
+    enabled: !!currentDriver && hasZafra,
+    staleTime: 60_000,
+  });
+
+  // ─── Picado ──────────────────────────────────────────────────────────────────
+  const sheets = sheetsQuery.data?.data ?? [];
   const picadoIngresos = sheets.reduce((s, sh) => s + (sh.driver_amount ?? 0), 0);
   const picadoViajes = sheets.reduce((s, sh) => s + (sh.trip_count ?? 0), 0);
 
+  // ─── Limones ─────────────────────────────────────────────────────────────────
+  const limonesViajes = limonesQ.data?.viajes ?? [];
   const limonesIngresos = limonesViajes.reduce((s, v) => s + (v.corte_chofer ?? 0), 0);
   const limonesViajesCount = limonesViajes.length;
 
-  const totalAnticipos = anticipos.reduce((s, a) => s + a.monto, 0);
-  const totalIngresos = (hasPicado ? picadoIngresos : 0) + (hasLimones ? limonesIngresos : 0);
-  const aCobrar = totalIngresos - totalAnticipos;
+  // ─── Zafra Amarillos ─────────────────────────────────────────────────────────
+  const zafraViajes = zafraViajesQ.data?.viajes ?? [];
+  const amarillosViajes = zafraViajes.filter(v => v.modalidad === "AMARILLOS");
+  const particularesViajes = zafraViajes.filter(v => v.modalidad === "PARTICULARES");
 
-  const limonesPromPorViaje = limonesViajesCount > 0 ? limonesIngresos / limonesViajesCount : null;
-  const picadoPromPorViaje = picadoViajes > 0 ? picadoIngresos / picadoViajes : null;
+  const diasTrabajados = (amarillosDiasQ.data?.dias ?? []).filter(d => d.trabajo).length;
+  const amarillosViajesCount = amarillosViajes.length;
+  const tarifaDiaria = zafraConfigQ.data?.config?.amarillos.tarifaDiariaConductor ?? 0;
+  const tarifaPorViaje = zafraConfigQ.data?.config?.amarillos.tarifaPorViajeConductor ?? 0;
+  const totalAmarillosDias = diasTrabajados * tarifaDiaria;
+  const totalAmarillosViajes = amarillosViajesCount * tarifaPorViaje;
+  const amarillosIngresos = totalAmarillosDias + totalAmarillosViajes;
+
+  // ─── Zafra Particulares ───────────────────────────────────────────────────────
+  const particularesIngresos = particularesViajes.reduce((s, v) => s + (v.comisionChofer ?? 0), 0);
+  const particularesCount = particularesViajes.length;
+
+  // ─── Totales ─────────────────────────────────────────────────────────────────
+  const anticipos = anticiposQuery.data ?? [];
+  const totalAnticipos = anticipos.reduce((s, a) => s + a.monto, 0);
+  const totalIngresos =
+    (hasPicado ? picadoIngresos : 0) +
+    (hasLimones ? limonesIngresos : 0) +
+    (hasZafra ? amarillosIngresos + particularesIngresos : 0);
+  const aCobrar = totalIngresos - totalAnticipos;
 
   const isPending =
     (hasPicado && sheetsQuery.isPending) ||
     anticiposQuery.isPending ||
-    (hasLimones && limonesQ.isPending);
+    (hasLimones && limonesQ.isPending) ||
+    (hasZafra && (zafraViajesQ.isPending || zafraConfigQ.isPending || amarillosDiasQ.isPending));
 
   const isError =
     (hasPicado && sheetsQuery.isError) ||
     anticiposQuery.isError ||
-    (hasLimones && limonesQ.isError);
+    (hasLimones && limonesQ.isError) ||
+    (hasZafra && (zafraViajesQ.isError || zafraConfigQ.isError || amarillosDiasQ.isError));
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,6 +131,11 @@ export function MiPagoPage() {
             if (hasPicado) sheetsQuery.refetch();
             anticiposQuery.refetch();
             if (hasLimones) limonesQ.refetch();
+            if (hasZafra) {
+              zafraViajesQ.refetch();
+              zafraConfigQ.refetch();
+              amarillosDiasQ.refetch();
+            }
           }}
         />
       )}
@@ -121,12 +170,34 @@ export function MiPagoPage() {
 
           {/* Módulos activos */}
           <div className="flex flex-col gap-4">
+            {hasZafra && (amarillosViajes.length > 0 || diasTrabajados > 0) && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Amarillos</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard label="Días" value={diasTrabajados} />
+                  <StatCard label="Total" value={moneyARS(totalAmarillosDias)} accent />
+                  <StatCard label="Viajes" value={amarillosViajesCount} />
+                  <StatCard label="Total" value={moneyARS(totalAmarillosViajes)} accent />
+                </div>
+              </div>
+            )}
+
+            {hasZafra && particularesViajes.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Particulares</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard label="Viajes" value={particularesCount} />
+                  <StatCard label="Total" value={moneyARS(particularesIngresos)} accent />
+                </div>
+              </div>
+            )}
+
             {hasLimones && (
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Limones</p>
                 <div className="grid grid-cols-2 gap-3">
                   <StatCard label="Viajes" value={limonesViajesCount} />
-                  <StatCard label="Prom/viaje" value={limonesPromPorViaje != null ? moneyARS(limonesPromPorViaje) : "—"} accent />
+                  <StatCard label="Total" value={moneyARS(limonesIngresos)} accent />
                 </div>
               </div>
             )}
@@ -136,7 +207,7 @@ export function MiPagoPage() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Picado</p>
                 <div className="grid grid-cols-2 gap-3">
                   <StatCard label="Viajes" value={picadoViajes} />
-                  <StatCard label="Prom/viaje" value={picadoPromPorViaje != null ? moneyARS(picadoPromPorViaje) : "—"} accent />
+                  <StatCard label="Total" value={moneyARS(picadoIngresos)} accent />
                 </div>
               </div>
             )}
