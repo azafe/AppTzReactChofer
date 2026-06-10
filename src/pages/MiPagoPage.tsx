@@ -4,10 +4,48 @@ import { useAuth } from "../context/AuthContext";
 import { getSheets, getAnticipos } from "../services/picadoApi";
 import { listMisViajesLimones } from "../services/limonesApi";
 import { listMisViajes, getZafraConfig, listMisAmarillosDias } from "../services/zafraApi";
-import { StatCard, Card, SectionTitle } from "../components/Card";
+import { Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard } from "../components/Spinner";
 import { moneyARS, monthRange } from "../lib/format";
+
+function ReceiptRow({
+  label,
+  sub,
+  amount,
+  accent,
+  bold,
+}: {
+  label: string;
+  sub?: string;
+  amount: string;
+  accent?: boolean;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex justify-between items-baseline gap-2 py-1">
+      <span className={`text-sm ${bold ? "font-semibold text-[var(--text)]" : "text-[var(--muted)]"}`}>
+        {label}
+        {sub && <span className="ml-1 text-xs text-[var(--muted)]">{sub}</span>}
+      </span>
+      <span className={`text-sm tabular-nums shrink-0 ${accent ? "font-bold text-tz-yellow" : bold ? "font-semibold text-[var(--text)]" : "text-[var(--text)]"}`}>
+        {amount}
+      </span>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)] mb-1 mt-3 first:mt-0">
+      {children}
+    </p>
+  );
+}
+
+function Divider() {
+  return <div className="border-t border-[var(--border)] my-2" />;
+}
 
 export function MiPagoPage() {
   const { currentDriver } = useAuth();
@@ -100,6 +138,9 @@ export function MiPagoPage() {
     (hasZafra ? amarillosIngresos + particularesIngresos : 0);
   const aCobrar = totalIngresos - totalAnticipos;
 
+  const hasAmarillos = hasZafra && (amarillosViajes.length > 0 || diasTrabajados > 0);
+  const hasParticulares = hasZafra && particularesViajes.length > 0;
+
   const isPending =
     (hasPicado && sheetsQuery.isPending) ||
     anticiposQuery.isPending ||
@@ -113,7 +154,7 @@ export function MiPagoPage() {
     (hasZafra && (zafraViajesQ.isError || zafraConfigQ.isError || amarillosDiasQ.isError));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <SectionTitle>Mi Pago</SectionTitle>
         <MonthPicker
@@ -153,65 +194,91 @@ export function MiPagoPage() {
             <p className="mt-1 text-xs text-[var(--muted)]">Ingresos menos anticipos recibidos</p>
           </Card>
 
-          {/* Desglose ingresos − anticipos */}
+          {/* Recibo de haberes */}
           <Card>
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[var(--muted)]">Ingresos</span>
-                <span className="font-semibold text-tz-yellow">{moneyARS(totalIngresos)}</span>
-              </div>
-              <div className="border-t border-[var(--border)]" />
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[var(--muted)]">− Anticipos</span>
-                <span className="font-semibold">{moneyARS(totalAnticipos)}</span>
-              </div>
+            {/* ── Amarillos ── */}
+            {hasAmarillos && (
+              <>
+                <SectionLabel>Amarillos</SectionLabel>
+                <ReceiptRow
+                  label="Días"
+                  sub={`(${diasTrabajados})`}
+                  amount={moneyARS(totalAmarillosDias)}
+                />
+                <ReceiptRow
+                  label="Viajes"
+                  sub={`(${amarillosViajesCount})`}
+                  amount={moneyARS(totalAmarillosViajes)}
+                />
+                <div className="border-t border-[var(--border)] mt-1 pt-1">
+                  <ReceiptRow
+                    label="Total Amarillos"
+                    amount={moneyARS(amarillosIngresos)}
+                    accent
+                    bold
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ── Particulares ── */}
+            {hasParticulares && (
+              <>
+                {hasAmarillos && <Divider />}
+                <SectionLabel>Particulares</SectionLabel>
+                <ReceiptRow
+                  label="Viajes"
+                  sub={`(${particularesCount})`}
+                  amount={moneyARS(particularesIngresos)}
+                />
+              </>
+            )}
+
+            {/* ── Limones ── */}
+            {hasLimones && (
+              <>
+                {(hasAmarillos || hasParticulares) && <Divider />}
+                <SectionLabel>Limones</SectionLabel>
+                <ReceiptRow
+                  label="Viajes"
+                  sub={`(${limonesViajesCount})`}
+                  amount={moneyARS(limonesIngresos)}
+                />
+              </>
+            )}
+
+            {/* ── Picado ── */}
+            {hasPicado && (
+              <>
+                {(hasAmarillos || hasParticulares || hasLimones) && <Divider />}
+                <SectionLabel>Picado</SectionLabel>
+                <ReceiptRow
+                  label="Viajes"
+                  sub={`(${picadoViajes})`}
+                  amount={moneyARS(picadoIngresos)}
+                />
+              </>
+            )}
+
+            {/* ── Total ingresos ── */}
+            <div className="border-t border-[var(--border)] mt-2 pt-2">
+              <ReceiptRow
+                label="Total ingresos"
+                amount={moneyARS(totalIngresos)}
+                bold
+              />
+            </div>
+
+            {/* ── Deducciones ── */}
+            <div className="border-t border-[var(--border)] mt-2 pt-2">
+              <SectionLabel>Deducciones</SectionLabel>
+              <ReceiptRow
+                label="Anticipos"
+                sub={anticipos.length > 0 ? `(${anticipos.length})` : undefined}
+                amount={`− ${moneyARS(totalAnticipos)}`}
+              />
             </div>
           </Card>
-
-          {/* Módulos activos */}
-          <div className="flex flex-col gap-4">
-            {hasZafra && (amarillosViajes.length > 0 || diasTrabajados > 0) && (
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Amarillos</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <StatCard label="Días" value={diasTrabajados} />
-                  <StatCard label="Total" value={moneyARS(totalAmarillosDias)} accent />
-                  <StatCard label="Viajes" value={amarillosViajesCount} />
-                  <StatCard label="Total" value={moneyARS(totalAmarillosViajes)} accent />
-                </div>
-              </div>
-            )}
-
-            {hasZafra && particularesViajes.length > 0 && (
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Particulares</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <StatCard label="Viajes" value={particularesCount} />
-                  <StatCard label="Total" value={moneyARS(particularesIngresos)} accent />
-                </div>
-              </div>
-            )}
-
-            {hasLimones && (
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Limones</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <StatCard label="Viajes" value={limonesViajesCount} />
-                  <StatCard label="Total" value={moneyARS(limonesIngresos)} accent />
-                </div>
-              </div>
-            )}
-
-            {hasPicado && (
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Picado</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <StatCard label="Viajes" value={picadoViajes} />
-                  <StatCard label="Total" value={moneyARS(picadoIngresos)} accent />
-                </div>
-              </div>
-            )}
-          </div>
         </>
       )}
     </div>
