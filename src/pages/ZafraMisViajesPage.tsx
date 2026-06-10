@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
-import { listMisViajes, getZafraConfig, type ZafraViaje } from "../services/zafraApi";
+import { listMisViajes, getZafraConfig, listMisAmarillosDias, type ZafraViaje } from "../services/zafraApi";
 import { ZafraNav } from "../components/ZafraNav";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
@@ -33,10 +33,17 @@ export function ZafraMisViajesPage() {
     staleTime: 300_000,
   });
 
+  const amarillosDiasQ = useQuery({
+    queryKey: ["amarillos-dias", currentDriver?.id, { from, to }],
+    queryFn: () => listMisAmarillosDias({ choferId: currentDriver!.id, from, to }),
+    enabled: !!currentDriver,
+    staleTime: 60_000,
+  });
+
   const viajes = viajesQ.data?.viajes ?? [];
   const amarillos = viajes.filter((v) => v.modalidad === "AMARILLOS");
 
-  const diasTrabajados = new Set(amarillos.map((v) => v.fecha)).size;
+  const diasTrabajados = (amarillosDiasQ.data?.dias ?? []).filter(d => d.trabajo).length;
   const cantidadViajes = amarillos.length;
 
   const tarifaDiaria = configQ.data?.config?.amarillos.tarifaDiariaConductor ?? 0;
