@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
-import { listMisViajes, type ZafraViaje } from "../services/zafraApi";
+import { listMisViajes, getZafraConfig, type ZafraViaje } from "../services/zafraApi";
 import { ZafraNav } from "../components/ZafraNav";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
@@ -27,10 +27,23 @@ export function ZafraMisViajesPage() {
     staleTime: 60_000,
   });
 
-  const viajes = viajesQ.data?.viajes ?? [];
+  const configQ = useQuery({
+    queryKey: ["zafra-config"],
+    queryFn: getZafraConfig,
+    staleTime: 300_000,
+  });
 
-  const totalComision = viajes.reduce((s, v) => s + (v.comisionChofer ?? 0), 0);
-  const diasTrabajados = new Set(viajes.map((v) => v.fecha)).size;
+  const viajes = viajesQ.data?.viajes ?? [];
+  const amarillos = viajes.filter((v) => v.modalidad === "AMARILLOS");
+
+  const diasTrabajados = new Set(amarillos.map((v) => v.fecha)).size;
+  const cantidadViajes = amarillos.length;
+
+  const tarifaDiaria = configQ.data?.config?.amarillos.tarifaDiariaConductor ?? 0;
+  const tarifaPorViaje = configQ.data?.config?.amarillos.tarifaPorViajeConductor ?? 0;
+
+  const totalDias = diasTrabajados * tarifaDiaria;
+  const totalViajes = cantidadViajes * tarifaPorViaje;
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,10 +62,11 @@ export function ZafraMisViajesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Viajes" value={viajes.length} />
+      <div className="grid grid-cols-2 gap-3">
         <StatCard label="Días" value={diasTrabajados} />
-        <StatCard label="Total" value={moneyARS(totalComision)} accent />
+        <StatCard label="Total" value={moneyARS(totalDias)} accent />
+        <StatCard label="Viajes" value={cantidadViajes} />
+        <StatCard label="Total" value={moneyARS(totalViajes)} accent />
       </div>
 
       {viajesQ.isPending && <PageSpinner />}
