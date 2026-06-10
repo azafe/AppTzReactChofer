@@ -30,6 +30,7 @@ export function ZafraMisViajesPage() {
   const viajes = viajesQ.data?.viajes ?? [];
 
   const totalComision = viajes.reduce((s, v) => s + (v.comisionChofer ?? 0), 0);
+  const diasTrabajados = new Set(viajes.map((v) => v.fecha)).size;
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,9 +49,10 @@ export function ZafraMisViajesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <StatCard label="Viajes" value={viajes.length} />
-        <StatCard label="Tu comisión" value={moneyARS(totalComision)} accent />
+        <StatCard label="Días" value={diasTrabajados} />
+        <StatCard label="Total" value={moneyARS(totalComision)} accent />
       </div>
 
       {viajesQ.isPending && <PageSpinner />}
