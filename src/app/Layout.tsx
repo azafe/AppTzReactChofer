@@ -7,7 +7,7 @@ import { InstallPrompt } from "../components/InstallPrompt";
 
 export function Layout() {
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex h-dvh">
       <SideNav />
       <div className="flex flex-1 flex-col">
         <TopBar />
