@@ -42,6 +42,7 @@ export function ZafraMisViajesPage() {
 
   const viajes = viajesQ.data?.viajes ?? [];
   const amarillos = viajes.filter((v) => v.modalidad === "AMARILLOS");
+  const particulares = viajes.filter((v) => v.modalidad === "PARTICULARES");
 
   const diasTrabajados = (amarillosDiasQ.data?.dias ?? []).filter(d => d.trabajo).length;
   const cantidadViajes = amarillos.length;
@@ -51,6 +52,8 @@ export function ZafraMisViajesPage() {
 
   const totalDias = diasTrabajados * tarifaDiaria;
   const totalViajes = cantidadViajes * tarifaPorViaje;
+
+  const totalParticulares = particulares.reduce((sum, v) => sum + (v.comisionChofer ?? 0), 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,11 +72,21 @@ export function ZafraMisViajesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Días" value={diasTrabajados} />
-        <StatCard label="Total" value={moneyARS(totalDias)} accent />
-        <StatCard label="Viajes" value={cantidadViajes} />
-        <StatCard label="Total" value={moneyARS(totalViajes)} accent />
+      <div className="flex flex-col gap-3">
+        {amarillos.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Días" value={diasTrabajados} />
+            <StatCard label="Total" value={moneyARS(totalDias)} accent />
+            <StatCard label="Viajes" value={cantidadViajes} />
+            <StatCard label="Total" value={moneyARS(totalViajes)} accent />
+          </div>
+        )}
+        {particulares.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Viajes Particulares" value={particulares.length} />
+            <StatCard label="Total" value={moneyARS(totalParticulares)} accent />
+          </div>
+        )}
       </div>
 
       {viajesQ.isPending && <PageSpinner />}
