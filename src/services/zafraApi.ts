@@ -25,6 +25,7 @@ export type ZafraViaje = {
   observaciones?: string | null;
   fotoRemitoUrl?: string | null;
   fotoGasoilUrl?: string | null;
+  ordenCargaNumero?: string | null;
   valorUnitarioARS?: number | null;
   valorTotalARS?: number | null;
   comisionChofer?: number | null;
@@ -72,6 +73,7 @@ export type ZafraViajeBody = {
   observaciones?: string | null;
   fotoRemitoUrl?: string | null;
   fotoGasoilUrl?: string | null;
+  ordenCargaNumero?: string | null;
   valorUnitarioARS?: number | null;
   valorTotalARS?: number | null;
   comisionChofer?: number | null;
@@ -159,6 +161,7 @@ export type ZafraOcrResult = {
   lugarNombre?: string;
   ingenioNombre?: string;
   fecha?: string;
+  ordenCargaNumero?: string;
 };
 
 export async function listMisAmarillosDias(params: {

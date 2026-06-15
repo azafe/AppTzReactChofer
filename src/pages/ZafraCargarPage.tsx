@@ -89,6 +89,7 @@ export function ZafraCargarPage() {
   const [gasoil, setGasoil] = useState("");
   const [pesoNetoKg, setPesoNetoKg] = useState("");
   const [ingenioNombre, setIngenioNombre] = useState("");
+  const [ordenCargaNumero, setOrdenCargaNumero] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
   const [fotoGasoilUrl, setFotoGasoilUrl] = useState<string | null>(null);
@@ -228,6 +229,11 @@ export function ZafraCargarPage() {
       newFilled.add("ingenioNombre");
     }
 
+    if (result.ordenCargaNumero) {
+      setOrdenCargaNumero(String(result.ordenCargaNumero));
+      newFilled.add("ordenCargaNumero");
+    }
+
     if (result.fecha && fecha === todayISO()) {
       const year = parseInt(result.fecha.slice(0, 4), 10);
       if (year >= 2025 && year <= 2030) {
@@ -281,6 +287,7 @@ export function ZafraCargarPage() {
         gasoil: gasoilN,
         pesoNetoKg: modalidad === "PARTICULARES" ? pesoN : null,
         ingenioNombre: ingenioNombre || null,
+        ordenCargaNumero: ordenCargaNumero.trim() || null,
         observaciones: observaciones.trim() || null,
         fotoRemitoUrl: fotoRemitoUrl || null,
         fotoGasoilUrl: fotoGasoilUrl || null,
@@ -311,6 +318,7 @@ export function ZafraCargarPage() {
       setGasoil("");
       setPesoNetoKg("");
       setIngenioNombre("");
+      setOrdenCargaNumero("");
       setLugarKmPagaIngenio(null);
       setObservaciones("");
       setFotoRemitoUrl(null);
@@ -595,12 +603,26 @@ export function ZafraCargarPage() {
           )}
         </Card>
 
-        {/* ── Datos detectados ─────────────────────────────────────── */}
+        {/* ── Extracto de Pesaje ───────────────────────────────────── */}
         <Card>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Datos del viaje
+            ⚖️ Extracto de Pesaje
           </p>
           <div className="flex flex-col gap-3">
+            <div>
+              <label className={labelCls}>
+                N° Orden de Carga
+                {ocrFilledFields.has("ordenCargaNumero") && <OcrBadge />}
+              </label>
+              <input
+                type="text"
+                value={ordenCargaNumero}
+                onChange={(e) => { setOrdenCargaNumero(e.target.value); clearOcr("ordenCargaNumero"); }}
+                placeholder="ej. 216266"
+                className={`${inputCls} ${ocrFilledFields.has("ordenCargaNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>
@@ -612,50 +634,6 @@ export function ZafraCargarPage() {
                   value={fecha}
                   onChange={(e) => { setFecha(e.target.value); clearOcr("fecha"); }}
                   className={`${inputCls} ${ocrFilledFields.has("fecha") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Modalidad</label>
-                <select
-                  value={modalidad}
-                  onChange={(e) => setModalidad(e.target.value as ZafraModalidad)}
-                  className={inputCls}
-                >
-                  <option value="PARTICULARES">Particulares</option>
-                  <option value="AMARILLOS">Amarillos</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>
-                  Lugar
-                  {ocrFilledFields.has("lugarNombre") && <OcrBadge />}
-                </label>
-                <CreatableCombobox
-                  items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
-                  value={lugarId}
-                  isLoading={lugaresQ.isLoading}
-                  className={`${inputCls} ${ocrFilledFields.has("lugarNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-                  onSelect={(id, label) => {
-                    setLugarId(id);
-                    setLugarNombre(label);
-                    if (id) clearOcr("lugarNombre");
-                    const lugar = (lugaresQ.data?.lugares ?? []).find((l) => l.id === id);
-                    setLugarKmPagaIngenio(lugar?.kmQuePagaIngenio ?? null);
-                  }}
-                  onCreate={async (text) => {
-                    try {
-                      const res = await createLugar({ nombre: text });
-                      queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
-                      setLugarKmPagaIngenio(null);
-                      return { id: res.lugar.id, label: res.lugar.nombre };
-                    } catch {
-                      showToast("Error al crear el lugar", "error");
-                      throw new Error("create failed");
-                    }
-                  }}
                 />
               </div>
               <div>
@@ -683,6 +661,77 @@ export function ZafraCargarPage() {
               </div>
             </div>
 
+            <div>
+              <label className={labelCls}>
+                Lugar (origen)
+                {ocrFilledFields.has("lugarNombre") && <OcrBadge />}
+              </label>
+              <CreatableCombobox
+                items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
+                value={lugarId}
+                isLoading={lugaresQ.isLoading}
+                className={`${inputCls} ${ocrFilledFields.has("lugarNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                onSelect={(id, label) => {
+                  setLugarId(id);
+                  setLugarNombre(label);
+                  if (id) clearOcr("lugarNombre");
+                  const lugar = (lugaresQ.data?.lugares ?? []).find((l) => l.id === id);
+                  setLugarKmPagaIngenio(lugar?.kmQuePagaIngenio ?? null);
+                }}
+                onCreate={async (text) => {
+                  try {
+                    const res = await createLugar({ nombre: text });
+                    queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
+                    setLugarKmPagaIngenio(null);
+                    return { id: res.lugar.id, label: res.lugar.nombre };
+                  } catch {
+                    showToast("Error al crear el lugar", "error");
+                    throw new Error("create failed");
+                  }
+                }}
+              />
+            </div>
+
+            {modalidad === "PARTICULARES" && (
+              <div>
+                <label className={labelCls}>
+                  Peso Neto (Kg) *
+                  {ocrFilledFields.has("pesoNetoKg") && <OcrBadge />}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={pesoNetoKg}
+                  onChange={(e) => { setPesoNetoKg(e.target.value); clearOcr("pesoNetoKg"); }}
+                  placeholder="0"
+                  className={`${inputCls} ${ocrFilledFields.has("pesoNetoKg") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                />
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* ── Orden de Carga ────────────────────────────────────────── */}
+        <Card>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            ⛽ Orden de Carga
+          </p>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className={labelCls}>
+                N° Orden de Carga
+                {ocrFilledFields.has("ordenCargaNumero") && <OcrBadge />}
+              </label>
+              <input
+                type="text"
+                value={ordenCargaNumero}
+                onChange={(e) => { setOrdenCargaNumero(e.target.value); clearOcr("ordenCargaNumero"); }}
+                placeholder="ej. 216266"
+                className={`${inputCls} ${ocrFilledFields.has("ordenCargaNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>
@@ -699,61 +748,60 @@ export function ZafraCargarPage() {
                   className={`${inputCls} ${ocrFilledFields.has("gasoil") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
                 />
               </div>
-              {modalidad === "PARTICULARES" && (
-                <div>
-                  <label className={labelCls}>
-                    Peso Neto (Kg) *
-                    {ocrFilledFields.has("pesoNetoKg") && <OcrBadge />}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={pesoNetoKg}
-                    onChange={(e) => { setPesoNetoKg(e.target.value); clearOcr("pesoNetoKg"); }}
-                    placeholder="0"
-                    className={`${inputCls} ${ocrFilledFields.has("pesoNetoKg") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-                  />
-                </div>
+              <div>
+                <label className={labelCls}>
+                  Ingenio (destino)
+                  {ocrFilledFields.has("ingenioNombre") && <OcrBadge />}
+                </label>
+                <input
+                  type="text"
+                  value={ingenioNombre}
+                  onChange={(e) => { setIngenioNombre(e.target.value); clearOcr("ingenioNombre"); }}
+                  placeholder="Ej: Cruz Alta"
+                  className={`${inputCls} ${ocrFilledFields.has("ingenioNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* ── Vehículo ─────────────────────────────────────────────── */}
+        <Card>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Vehículo
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Modalidad</label>
+              <select
+                value={modalidad}
+                onChange={(e) => setModalidad(e.target.value as ZafraModalidad)}
+                className={inputCls}
+              >
+                <option value="PARTICULARES">Particulares</option>
+                <option value="AMARILLOS">Amarillos</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Camión</label>
+              {unidades.length > 0 ? (
+                <select
+                  value={camionVehicleId}
+                  onChange={(e) => setCamionVehicleId(e.target.value)}
+                  className={inputCls}
+                >
+                  {unidades.map((u) => (
+                    <option key={u.vehicleId} value={u.vehicleId}>{u.vehicleLabel}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
               )}
             </div>
-
-            <div>
-              <label className={labelCls}>
-                Ingenio
-                {ocrFilledFields.has("ingenioNombre") && <OcrBadge />}
-              </label>
-              <input
-                type="text"
-                value={ingenioNombre}
-                onChange={(e) => { setIngenioNombre(e.target.value); clearOcr("ingenioNombre"); }}
-                placeholder="Ej: Ingenio Cruz Alta"
-                className={`${inputCls} ${ocrFilledFields.has("ingenioNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Chofer</label>
-                <div className={readonlyCls}>{currentDriver?.name ?? ""}</div>
-              </div>
-              <div>
-                <label className={labelCls}>Camión</label>
-                {unidades.length > 0 ? (
-                  <select
-                    value={camionVehicleId}
-                    onChange={(e) => setCamionVehicleId(e.target.value)}
-                    className={inputCls}
-                  >
-                    {unidades.map((u) => (
-                      <option key={u.vehicleId} value={u.vehicleId}>{u.vehicleLabel}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
-                )}
-              </div>
-            </div>
+          </div>
+          <div className="mt-3">
+            <label className={labelCls}>Chofer</label>
+            <div className={readonlyCls}>{currentDriver?.name ?? ""}</div>
           </div>
         </Card>
 
