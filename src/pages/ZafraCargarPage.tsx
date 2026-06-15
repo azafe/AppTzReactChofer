@@ -90,6 +90,7 @@ export function ZafraCargarPage() {
   const [pesoNetoKg, setPesoNetoKg] = useState("");
   const [ingenioNombre, setIngenioNombre] = useState("");
   const [ordenCargaNumero, setOrdenCargaNumero] = useState("");
+  const [ordenRemitoNumero, setOrdenRemitoNumero] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
   const [fotoGasoilUrl, setFotoGasoilUrl] = useState<string | null>(null);
@@ -229,9 +230,13 @@ export function ZafraCargarPage() {
       newFilled.add("ingenioNombre");
     }
 
-    if (result.ordenCargaNumero) {
+    if (source === "gasoil" && result.ordenCargaNumero) {
       setOrdenCargaNumero(String(result.ordenCargaNumero));
       newFilled.add("ordenCargaNumero");
+    }
+    if (source === "remito" && result.ordenRemitoNumero) {
+      setOrdenRemitoNumero(String(result.ordenRemitoNumero));
+      newFilled.add("ordenRemitoNumero");
     }
 
     if (result.fecha && fecha === todayISO()) {
@@ -288,6 +293,7 @@ export function ZafraCargarPage() {
         pesoNetoKg: modalidad === "PARTICULARES" ? pesoN : null,
         ingenioNombre: ingenioNombre || null,
         ordenCargaNumero: ordenCargaNumero.trim() || null,
+        ordenRemitoNumero: ordenRemitoNumero.trim() || null,
         observaciones: observaciones.trim() || null,
         fotoRemitoUrl: fotoRemitoUrl || null,
         fotoGasoilUrl: fotoGasoilUrl || null,
@@ -319,6 +325,7 @@ export function ZafraCargarPage() {
       setPesoNetoKg("");
       setIngenioNombre("");
       setOrdenCargaNumero("");
+      setOrdenRemitoNumero("");
       setLugarKmPagaIngenio(null);
       setObservaciones("");
       setFotoRemitoUrl(null);
@@ -737,15 +744,15 @@ export function ZafraCargarPage() {
 
             <div>
               <label className={labelCls}>
-                N° Orden de Carga
-                {ocrFilledFields.has("ordenCargaNumero") && <OcrBadge />}
+                N° Orden (del extracto)
+                {ocrFilledFields.has("ordenRemitoNumero") && <OcrBadge />}
               </label>
               <input
                 type="text"
-                value={ordenCargaNumero}
-                onChange={(e) => { setOrdenCargaNumero(e.target.value); clearOcr("ordenCargaNumero"); }}
+                value={ordenRemitoNumero}
+                onChange={(e) => { setOrdenRemitoNumero(e.target.value); clearOcr("ordenRemitoNumero"); }}
                 placeholder="ej. 216266"
-                className={`${inputCls} ${ocrFilledFields.has("ordenCargaNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                className={`${inputCls} ${ocrFilledFields.has("ordenRemitoNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
               />
             </div>
           </div>
@@ -759,7 +766,7 @@ export function ZafraCargarPage() {
           <div className="flex flex-col gap-3">
             <div>
               <label className={labelCls}>
-                N° Orden de Carga
+                N° Orden (de la orden)
                 {ocrFilledFields.has("ordenCargaNumero") && <OcrBadge />}
               </label>
               <input
