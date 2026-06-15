@@ -563,6 +563,46 @@ export function ZafraCargarPage() {
           </div>
         </div>
 
+        {/* ── Vehículo ─────────────────────────────────────────────── */}
+        <Card>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Vehículo
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Modalidad</label>
+              <select
+                value={modalidad}
+                onChange={(e) => setModalidad(e.target.value as ZafraModalidad)}
+                className={inputCls}
+              >
+                <option value="PARTICULARES">Particulares</option>
+                <option value="AMARILLOS">Amarillos</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Camión</label>
+              {unidades.length > 0 ? (
+                <select
+                  value={camionVehicleId}
+                  onChange={(e) => setCamionVehicleId(e.target.value)}
+                  className={inputCls}
+                >
+                  {unidades.map((u) => (
+                    <option key={u.vehicleId} value={u.vehicleId}>{u.vehicleLabel}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
+              )}
+            </div>
+          </div>
+          <div className="mt-3">
+            <label className={labelCls}>Chofer</label>
+            <div className={readonlyCls}>{currentDriver?.name ?? ""}</div>
+          </div>
+        </Card>
+
         {/* ── Odómetro ─────────────────────────────────────────────── */}
         <Card>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -611,54 +651,15 @@ export function ZafraCargarPage() {
           <div className="flex flex-col gap-3">
             <div>
               <label className={labelCls}>
-                N° Orden de Carga
-                {ocrFilledFields.has("ordenCargaNumero") && <OcrBadge />}
+                Fecha
+                {ocrFilledFields.has("fecha") && <OcrBadge />}
               </label>
               <input
-                type="text"
-                value={ordenCargaNumero}
-                onChange={(e) => { setOrdenCargaNumero(e.target.value); clearOcr("ordenCargaNumero"); }}
-                placeholder="ej. 216266"
-                className={`${inputCls} ${ocrFilledFields.has("ordenCargaNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                type="date"
+                value={fecha}
+                onChange={(e) => { setFecha(e.target.value); clearOcr("fecha"); }}
+                className={`${inputCls} ${ocrFilledFields.has("fecha") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>
-                  Fecha
-                  {ocrFilledFields.has("fecha") && <OcrBadge />}
-                </label>
-                <input
-                  type="date"
-                  value={fecha}
-                  onChange={(e) => { setFecha(e.target.value); clearOcr("fecha"); }}
-                  className={`${inputCls} ${ocrFilledFields.has("fecha") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>
-                  Frente
-                  {ocrFilledFields.has("frenteNumero") && <OcrBadge />}
-                </label>
-                <CreatableCombobox
-                  items={(frentesQ.data?.frentes ?? []).map((f) => ({ id: f.id, label: f.numero }))}
-                  value={frenteId}
-                  isLoading={frentesQ.isLoading}
-                  className={`${inputCls} ${ocrFilledFields.has("frenteNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-                  onSelect={(id, label) => { setFrenteId(id); setFrenteNumero(label); if (id) clearOcr("frenteNumero"); }}
-                  onCreate={async (text) => {
-                    try {
-                      const res = await createFrente({ numero: text });
-                      queryClient.invalidateQueries({ queryKey: ["zafra-frentes"] });
-                      return { id: res.frente.id, label: res.frente.numero };
-                    } catch {
-                      showToast("Error al crear el frente", "error");
-                      throw new Error("create failed");
-                    }
-                  }}
-                />
-              </div>
             </div>
 
             <div>
@@ -692,6 +693,30 @@ export function ZafraCargarPage() {
               />
             </div>
 
+            <div>
+              <label className={labelCls}>
+                Frente
+                {ocrFilledFields.has("frenteNumero") && <OcrBadge />}
+              </label>
+              <CreatableCombobox
+                items={(frentesQ.data?.frentes ?? []).map((f) => ({ id: f.id, label: f.numero }))}
+                value={frenteId}
+                isLoading={frentesQ.isLoading}
+                className={`${inputCls} ${ocrFilledFields.has("frenteNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                onSelect={(id, label) => { setFrenteId(id); setFrenteNumero(label); if (id) clearOcr("frenteNumero"); }}
+                onCreate={async (text) => {
+                  try {
+                    const res = await createFrente({ numero: text });
+                    queryClient.invalidateQueries({ queryKey: ["zafra-frentes"] });
+                    return { id: res.frente.id, label: res.frente.numero };
+                  } catch {
+                    showToast("Error al crear el frente", "error");
+                    throw new Error("create failed");
+                  }
+                }}
+              />
+            </div>
+
             {modalidad === "PARTICULARES" && (
               <div>
                 <label className={labelCls}>
@@ -709,6 +734,20 @@ export function ZafraCargarPage() {
                 />
               </div>
             )}
+
+            <div>
+              <label className={labelCls}>
+                N° Orden de Carga
+                {ocrFilledFields.has("ordenCargaNumero") && <OcrBadge />}
+              </label>
+              <input
+                type="text"
+                value={ordenCargaNumero}
+                onChange={(e) => { setOrdenCargaNumero(e.target.value); clearOcr("ordenCargaNumero"); }}
+                placeholder="ej. 216266"
+                className={`${inputCls} ${ocrFilledFields.has("ordenCargaNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+              />
+            </div>
           </div>
         </Card>
 
@@ -762,46 +801,6 @@ export function ZafraCargarPage() {
                 />
               </div>
             </div>
-          </div>
-        </Card>
-
-        {/* ── Vehículo ─────────────────────────────────────────────── */}
-        <Card>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Vehículo
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Modalidad</label>
-              <select
-                value={modalidad}
-                onChange={(e) => setModalidad(e.target.value as ZafraModalidad)}
-                className={inputCls}
-              >
-                <option value="PARTICULARES">Particulares</option>
-                <option value="AMARILLOS">Amarillos</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Camión</label>
-              {unidades.length > 0 ? (
-                <select
-                  value={camionVehicleId}
-                  onChange={(e) => setCamionVehicleId(e.target.value)}
-                  className={inputCls}
-                >
-                  {unidades.map((u) => (
-                    <option key={u.vehicleId} value={u.vehicleId}>{u.vehicleLabel}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
-              )}
-            </div>
-          </div>
-          <div className="mt-3">
-            <label className={labelCls}>Chofer</label>
-            <div className={readonlyCls}>{currentDriver?.name ?? ""}</div>
           </div>
         </Card>
 
