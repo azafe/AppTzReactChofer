@@ -604,9 +604,41 @@ export function ZafraCargarPage() {
               )}
             </div>
           </div>
-          <div className="mt-3">
-            <label className={labelCls}>Chofer</label>
-            <div className={readonlyCls}>{currentDriver?.name ?? ""}</div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Chofer</label>
+              <div className={readonlyCls}>{currentDriver?.name ?? ""}</div>
+            </div>
+            <div>
+              <label className={labelCls}>
+                Lugar (origen)
+                {ocrFilledFields.has("lugarNombre") && <OcrBadge />}
+              </label>
+              <CreatableCombobox
+                items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
+                value={lugarId}
+                isLoading={lugaresQ.isLoading}
+                className={`${inputCls} ${ocrFilledFields.has("lugarNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                onSelect={(id, label) => {
+                  setLugarId(id);
+                  setLugarNombre(label);
+                  if (id) clearOcr("lugarNombre");
+                  const lugar = (lugaresQ.data?.lugares ?? []).find((l) => l.id === id);
+                  setLugarKmPagaIngenio(lugar?.kmQuePagaIngenio ?? null);
+                }}
+                onCreate={async (text) => {
+                  try {
+                    const res = await createLugar({ nombre: text });
+                    queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
+                    setLugarKmPagaIngenio(null);
+                    return { id: res.lugar.id, label: res.lugar.nombre };
+                  } catch {
+                    showToast("Error al crear el lugar", "error");
+                    throw new Error("create failed");
+                  }
+                }}
+              />
+            </div>
           </div>
         </Card>
 
@@ -666,37 +698,6 @@ export function ZafraCargarPage() {
                 value={fecha}
                 onChange={(e) => { setFecha(e.target.value); clearOcr("fecha"); }}
                 className={`${inputCls} ${ocrFilledFields.has("fecha") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-              />
-            </div>
-
-            <div>
-              <label className={labelCls}>
-                Lugar (origen)
-                {ocrFilledFields.has("lugarNombre") && <OcrBadge />}
-              </label>
-              <CreatableCombobox
-                items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
-                value={lugarId}
-                isLoading={lugaresQ.isLoading}
-                className={`${inputCls} ${ocrFilledFields.has("lugarNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-                onSelect={(id, label) => {
-                  setLugarId(id);
-                  setLugarNombre(label);
-                  if (id) clearOcr("lugarNombre");
-                  const lugar = (lugaresQ.data?.lugares ?? []).find((l) => l.id === id);
-                  setLugarKmPagaIngenio(lugar?.kmQuePagaIngenio ?? null);
-                }}
-                onCreate={async (text) => {
-                  try {
-                    const res = await createLugar({ nombre: text });
-                    queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
-                    setLugarKmPagaIngenio(null);
-                    return { id: res.lugar.id, label: res.lugar.nombre };
-                  } catch {
-                    showToast("Error al crear el lugar", "error");
-                    throw new Error("create failed");
-                  }
-                }}
               />
             </div>
 
