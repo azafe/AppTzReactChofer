@@ -24,6 +24,7 @@ export type LimonViaje = {
   ingreso_bruto?: number | null;
   corte_chofer?: number | null;
   es_vacio?: boolean;
+  numero_ticket?: string | null;
   createdAt?: string | null;
 };
 
@@ -60,6 +61,7 @@ export type LimonViajeBody = {
   ingreso_bruto?: number | null;
   corte_chofer?: number | null;
   es_vacio?: boolean;
+  numero_ticket?: string | null;
 };
 
 export type LimonCamion = { vehicleId: string; vehicleLabel: string; consumo_teorico_l100km?: number | null; tieneOdometro?: boolean };

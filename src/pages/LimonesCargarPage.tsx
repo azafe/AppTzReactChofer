@@ -31,6 +31,7 @@ export function LimonesCargarPage() {
   const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
   const [camionNombre, setCamionNombre] = useState(currentDriver?.vehicleLabel ?? "");
   const [observaciones, setObservaciones] = useState("");
+  const [numeroTicket, setNumeroTicket] = useState("");
   const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
   const [uploadingRemito, setUploadingRemito] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -128,6 +129,7 @@ export function LimonesCargarPage() {
           ingreso_bruto: finca!.precio_vacio!,
           corte_chofer: finca!.precio_vacio! * 0.15,
           es_vacio: true,
+          numero_ticket: numeroTicket.trim() || null,
         });
       } else {
         const peso = parseFloat(pesoRealKg);
@@ -153,6 +155,7 @@ export function LimonesCargarPage() {
           ingreso_bruto: calc.ingreso_bruto,
           corte_chofer: calc.corte_chofer,
           es_vacio: false,
+          numero_ticket: numeroTicket.trim() || null,
         });
       }
     },
@@ -165,6 +168,7 @@ export function LimonesCargarPage() {
       setPesoRealKg("");
       setEsVacio(false);
       setObservaciones("");
+      setNumeroTicket("");
       setFotoRemitoUrl(null);
       setErrors([]);
     },
@@ -407,6 +411,18 @@ export function LimonesCargarPage() {
               </button>
             </div>
           )}
+        </Card>
+
+        {/* N° de Ticket */}
+        <Card>
+          <label className={labelCls}>N° de Ticket</label>
+          <input
+            type="text"
+            className={inputCls}
+            placeholder="Ej: 00012345"
+            value={numeroTicket}
+            onChange={(e) => setNumeroTicket(e.target.value)}
+          />
         </Card>
 
         {/* Observaciones */}
