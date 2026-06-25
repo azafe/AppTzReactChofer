@@ -153,7 +153,11 @@ export function ZafraCargarPage() {
   const unidades = unidadesQ.data?.unidades ?? [];
   const resolvedConfig = config.particulares;
 
-  const selectedUnidad = unidades.find((u) => u.vehicleId === camionVehicleId);
+  // Si el driver no tiene vehicleId propio, usar el primer camión disponible de la lista
+  const effectiveCamionVehicleId =
+    camionVehicleId || unidades[0]?.vehicleId || "";
+
+  const selectedUnidad = unidades.find((u) => u.vehicleId === effectiveCamionVehicleId);
   const requiereOdometro = selectedUnidad?.tieneOdometro !== false;
 
   const kmSalidaN = asNum(kmSalida);
@@ -272,7 +276,7 @@ export function ZafraCargarPage() {
       if (errs.length) throw Object.assign(new Error("validation"), { validationErrors: errs });
 
       const camionNombre =
-        unidades.find((u) => u.vehicleId === camionVehicleId)?.vehicleLabel ??
+        unidades.find((u) => u.vehicleId === effectiveCamionVehicleId)?.vehicleLabel ??
         currentDriver!.vehicleLabel ??
         "";
 
@@ -281,7 +285,7 @@ export function ZafraCargarPage() {
         fecha,
         choferId: currentDriver!.id,
         choferNombre: currentDriver!.name,
-        camionId: camionVehicleId || (currentDriver!.vehicleId ?? ""),
+        camionId: effectiveCamionVehicleId,
         camionNombre,
         lugarId: lugarId || null,
         lugarNombre: lugarNombre || null,
@@ -591,7 +595,7 @@ export function ZafraCargarPage() {
               <label className={labelCls}>Camión</label>
               {unidades.length > 0 ? (
                 <select
-                  value={camionVehicleId}
+                  value={effectiveCamionVehicleId}
                   onChange={(e) => setCamionVehicleId(e.target.value)}
                   className={inputCls}
                 >
