@@ -12,6 +12,7 @@ import {
   uploadZafraFoto,
   ocrZafraDocumento,
   listMisViajes,
+  tarifaAmarillosVigente,
   type ZafraModalidad,
   type ZafraConfig,
   type ZafraOcrResult,
@@ -314,7 +315,7 @@ export function ZafraCargarPage() {
             }
           : {}),
         ...(modalidad === "AMARILLOS"
-          ? { comisionChofer: config.amarillos.tarifaPorViajeConductor }
+          ? { comisionChofer: tarifaAmarillosVigente(config.amarillos, fecha).tarifaPorViajeConductor }
           : {}),
       };
 

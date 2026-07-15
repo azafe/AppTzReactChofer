@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { getSheets, getAnticipos } from "../services/picadoApi";
 import { listMisViajesLimones } from "../services/limonesApi";
-import { listMisViajes, getZafraConfig, listMisAmarillosDias } from "../services/zafraApi";
+import { listMisViajes, getZafraConfig, listMisAmarillosDias, tarifaAmarillosVigente } from "../services/zafraApi";
 import { Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard } from "../components/Spinner";
@@ -117,12 +117,15 @@ export function MiPagoPage() {
   const amarillosViajes = zafraViajes.filter(v => v.modalidad === "AMARILLOS");
   const particularesViajes = zafraViajes.filter(v => v.modalidad === "PARTICULARES");
 
-  const diasTrabajados = (amarillosDiasQ.data?.dias ?? []).filter(d => d.trabajo).length;
+  // La tarifa puede cambiar durante el período: se aplica la vigente en cada fecha
+  const amarillosCfg = zafraConfigQ.data?.config?.amarillos;
+  const diasTrabajadosList = (amarillosDiasQ.data?.dias ?? []).filter(d => d.trabajo);
+  const diasTrabajados = diasTrabajadosList.length;
   const amarillosViajesCount = amarillosViajes.length;
-  const tarifaDiaria = zafraConfigQ.data?.config?.amarillos.tarifaDiariaConductor ?? 0;
-  const tarifaPorViaje = zafraConfigQ.data?.config?.amarillos.tarifaPorViajeConductor ?? 0;
-  const totalAmarillosDias = diasTrabajados * tarifaDiaria;
-  const totalAmarillosViajes = amarillosViajesCount * tarifaPorViaje;
+  const totalAmarillosDias = diasTrabajadosList.reduce(
+    (s, d) => s + tarifaAmarillosVigente(amarillosCfg, d.fecha).tarifaDiariaConductor, 0);
+  const totalAmarillosViajes = amarillosViajes.reduce(
+    (s, v) => s + tarifaAmarillosVigente(amarillosCfg, v.fecha).tarifaPorViajeConductor, 0);
   const amarillosIngresos = totalAmarillosDias + totalAmarillosViajes;
 
   // ─── Zafra Particulares ───────────────────────────────────────────────────────

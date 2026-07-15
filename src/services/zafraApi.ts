@@ -42,6 +42,12 @@ export type ZafraLugar = { id: string; nombre: string; kmQuePagaIngenio?: number
 export type ZafraFrente = { id: string; numero: string; nombre?: string | null };
 export type ZafraCamion = { vehicleId: string; vehicleLabel: string; tieneOdometro?: boolean };
 
+export type ZafraAmarillosTarifa = {
+  gananciaDiariaOwner: number;
+  tarifaDiariaConductor: number;
+  tarifaPorViajeConductor: number;
+};
+
 export type ZafraConfig = {
   particulares: {
     tarifaBase: number;
@@ -49,12 +55,32 @@ export type ZafraConfig = {
     tarifaPorKmReducida: number;
     porcentajeComision: number;
   };
-  amarillos: {
-    gananciaDiariaOwner: number;
-    tarifaDiariaConductor: number;
-    tarifaPorViajeConductor: number;
+  amarillos: ZafraAmarillosTarifa & {
+    // Historial de tarifas: se aplica la vigente en cada fecha
+    vigencias?: Array<ZafraAmarillosTarifa & { desde: string }>;
   };
 };
+
+// Resuelve la tarifa de Amarillos vigente en una fecha (YYYY-MM-DD);
+// sin vigencias usa los valores planos de config.amarillos.
+export function tarifaAmarillosVigente(
+  amarillos: ZafraConfig["amarillos"] | undefined,
+  fecha: string
+): ZafraAmarillosTarifa {
+  const base = {
+    gananciaDiariaOwner: amarillos?.gananciaDiariaOwner ?? 0,
+    tarifaDiariaConductor: amarillos?.tarifaDiariaConductor ?? 0,
+    tarifaPorViajeConductor: amarillos?.tarifaPorViajeConductor ?? 0,
+  };
+  const vigencias = amarillos?.vigencias ?? [];
+  if (vigencias.length === 0 || !fecha) return base;
+  const sorted = [...vigencias].sort((a, b) => a.desde.localeCompare(b.desde));
+  let match = null;
+  for (const v of sorted) {
+    if (v.desde <= fecha) match = v;
+  }
+  return match ?? sorted[0];
+}
 
 export type ZafraViajeBody = {
   modalidad: ZafraModalidad;
