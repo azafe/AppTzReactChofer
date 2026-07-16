@@ -8,6 +8,7 @@ import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard, EmptyState } from "../components/Spinner";
 import { moneyARS, dateAR, monthRange } from "../lib/format";
 import { ZafraViajeModal } from "../components/ZafraViajeModal";
+import { DiasAmarillosModal } from "../components/DiasAmarillosModal";
 
 export function ZafraMisViajesPage() {
   const { currentDriver } = useAuth();
@@ -16,6 +17,7 @@ export function ZafraMisViajesPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [selectedViaje, setSelectedViaje] = useState<ZafraViaje | null>(null);
+  const [diasModalOpen, setDiasModalOpen] = useState(false);
 
   const { from, to } = monthRange(year, month);
 
@@ -44,7 +46,11 @@ export function ZafraMisViajesPage() {
   const amarillos = viajes.filter((v) => v.modalidad === "AMARILLOS");
   const particulares = viajes.filter((v) => v.modalidad === "PARTICULARES");
 
-  const diasTrabajados = (amarillosDiasQ.data?.dias ?? []).filter(d => d.trabajo).length;
+  // Un día compartido con otro chofer llega como una fila con porcentaje 0.5 (no 1)
+  // — se pondera por ese porcentaje en vez de contar el día como completo.
+  const diasTrabajados = (amarillosDiasQ.data?.dias ?? [])
+    .filter(d => d.trabajo)
+    .reduce((s, d) => s + (d.porcentaje ?? 1), 0);
   const cantidadViajes = amarillos.length;
 
   const tarifaDiaria = configQ.data?.config?.amarillos.tarifaDiariaConductor ?? 0;
@@ -75,7 +81,7 @@ export function ZafraMisViajesPage() {
       <div className="flex flex-col gap-3">
         {amarillos.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Días" value={diasTrabajados} />
+            <StatCard label="Días" value={diasTrabajados} onClick={() => setDiasModalOpen(true)} />
             <StatCard label="Total" value={moneyARS(totalDias)} accent />
             <StatCard label="Viajes" value={cantidadViajes} />
             <StatCard label="Total" value={moneyARS(totalViajes)} accent />
@@ -182,6 +188,14 @@ export function ZafraMisViajesPage() {
             queryClient.invalidateQueries({ queryKey: ["zafra"] });
             setSelectedViaje(null);
           }}
+        />
+      )}
+
+      {diasModalOpen && (
+        <DiasAmarillosModal
+          dias={(amarillosDiasQ.data?.dias ?? []).filter((d) => d.trabajo)}
+          tarifaDiaria={tarifaDiaria}
+          onClose={() => setDiasModalOpen(false)}
         />
       )}
     </div>

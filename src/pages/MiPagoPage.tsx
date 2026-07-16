@@ -117,13 +117,15 @@ export function MiPagoPage() {
   const amarillosViajes = zafraViajes.filter(v => v.modalidad === "AMARILLOS");
   const particularesViajes = zafraViajes.filter(v => v.modalidad === "PARTICULARES");
 
-  // La tarifa puede cambiar durante el período: se aplica la vigente en cada fecha
+  // La tarifa puede cambiar durante el período: se aplica la vigente en cada fecha.
+  // Un día compartido con otro chofer llega como una fila con porcentaje 0.5 (no 1)
+  // — se pondera el conteo de días y el jornal por ese porcentaje, no como día entero.
   const amarillosCfg = zafraConfigQ.data?.config?.amarillos;
   const diasTrabajadosList = (amarillosDiasQ.data?.dias ?? []).filter(d => d.trabajo);
-  const diasTrabajados = diasTrabajadosList.length;
+  const diasTrabajados = diasTrabajadosList.reduce((s, d) => s + (d.porcentaje ?? 1), 0);
   const amarillosViajesCount = amarillosViajes.length;
   const totalAmarillosDias = diasTrabajadosList.reduce(
-    (s, d) => s + tarifaAmarillosVigente(amarillosCfg, d.fecha).tarifaDiariaConductor, 0);
+    (s, d) => s + tarifaAmarillosVigente(amarillosCfg, d.fecha).tarifaDiariaConductor * (d.porcentaje ?? 1), 0);
   const totalAmarillosViajes = amarillosViajes.reduce(
     (s, v) => s + tarifaAmarillosVigente(amarillosCfg, v.fecha).tarifaPorViajeConductor, 0);
   const amarillosIngresos = totalAmarillosDias + totalAmarillosViajes;

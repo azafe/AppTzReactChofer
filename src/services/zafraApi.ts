@@ -197,7 +197,18 @@ export async function listMisAmarillosDias(params: {
   choferId: string;
   from?: string;
   to?: string;
-}): Promise<{ ok: boolean; dias: Array<{ id: string; fecha: string; camionId: string; trabajo: boolean }> }> {
+}): Promise<{
+  ok: boolean;
+  dias: Array<{
+    id: string;
+    fecha: string;
+    camionId: string;
+    camionNombre: string;
+    trabajo: boolean;
+    porcentaje?: number;
+    compartidoCon?: string | null;
+  }>;
+}> {
   const q = new URLSearchParams({ choferId: params.choferId });
   if (params.from) q.set("from", params.from);
   if (params.to) q.set("to", params.to);

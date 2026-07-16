@@ -20,11 +20,12 @@ interface StatCardProps {
   value: string | number;
   sub?: string;
   accent?: boolean;
+  onClick?: () => void;
 }
 
-export function StatCard({ label, value, sub, accent = false }: StatCardProps) {
-  return (
-    <Card>
+export function StatCard({ label, value, sub, accent = false, onClick }: StatCardProps) {
+  const content = (
+    <>
       <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
         {label}
       </p>
@@ -34,7 +35,19 @@ export function StatCard({ label, value, sub, accent = false }: StatCardProps) {
         {value}
       </p>
       {sub && <p className="mt-0.5 text-xs text-[var(--muted)]">{sub}</p>}
-    </Card>
+    </>
+  );
+
+  if (!onClick) return <Card>{content}</Card>;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-3xl border border-white/10 bg-[rgba(20,26,36,0.9)] p-4 text-left shadow-card transition active:scale-[0.98]"
+    >
+      {content}
+    </button>
   );
 }
 
