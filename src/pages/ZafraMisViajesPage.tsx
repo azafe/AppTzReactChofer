@@ -81,7 +81,12 @@ export function ZafraMisViajesPage() {
       <div className="flex flex-col gap-3">
         {amarillos.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Días" value={diasTrabajados} onClick={() => setDiasModalOpen(true)} />
+            <StatCard
+              label="Días"
+              value={diasTrabajados}
+              sub="Ver detalle →"
+              onClick={() => setDiasModalOpen(true)}
+            />
             <StatCard label="Total" value={moneyARS(totalDias)} accent />
             <StatCard label="Viajes" value={cantidadViajes} />
             <StatCard label="Total" value={moneyARS(totalViajes)} accent />
