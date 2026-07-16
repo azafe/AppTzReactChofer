@@ -26,7 +26,7 @@ export function DiasAmarillosModal({ dias, tarifaDiaria, onClose }: DiasAmarillo
         onClick={onClose}
       >
         <div
-          className="w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-[#0a0c0f] p-6 shadow-xl max-h-[90vh]"
+          className="w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-[#0a0c0f] p-6 shadow-xl max-h-[70vh]"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex items-center justify-between">
