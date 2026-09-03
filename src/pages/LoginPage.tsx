@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export function LoginPage() {
-  const { login, currentDriver } = useAuth();
+  const { login, currentDriver, sessionMessage } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
@@ -19,12 +19,12 @@ export function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const ok = await login(username, pin);
+    const result = await login(username, pin);
     setLoading(false);
-    if (ok) {
+    if (result.ok) {
       navigate("/", { replace: true });
     } else {
-      setError("Usuario o PIN incorrecto.");
+      setError(result.error);
     }
   }
 
@@ -78,9 +78,9 @@ export function LoginPage() {
               />
             </div>
 
-            {error && (
+            {(error || sessionMessage) && (
               <p className="rounded-xl bg-tz-red/10 px-3 py-2 text-sm text-tz-red">
-                {error}
+                {error || sessionMessage}
               </p>
             )}
 

@@ -7,3 +7,5 @@ export type DriverAccount = {
   vehicleId?: string;
   modulos: string[];
 };
+
+export type LoginResult = { ok: true } | { ok: false; error: string };
