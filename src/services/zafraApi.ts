@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPostForm, apiPut, apiDelete } from "../lib/http";
+import { comprimirImagen } from "../lib/comprimirImagen";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ export async function uploadZafraFoto(
   tipo: "remito" | "gasoil"
 ): Promise<{ ok: boolean; url: string }> {
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("file", await comprimirImagen(file));
   fd.append("tipo", tipo);
   return apiPostForm("/registro-viajes/upload-foto", fd);
 }

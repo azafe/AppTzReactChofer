@@ -1,4 +1,5 @@
 import { apiGet, apiPatch, apiPost, apiPostForm } from "../lib/http";
+import { comprimirImagen } from "../lib/comprimirImagen";
 import type { LimonFinca } from "../types/limones";
 export type { LimonFinca };
 
@@ -132,7 +133,7 @@ export async function uploadLimonesFoto(
   tipo: "limones-remito" | "limones-gasoil"
 ): Promise<{ ok: boolean; url: string }> {
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("file", await comprimirImagen(file));
   fd.append("tipo", tipo);
   return apiPostForm("/limones/upload-foto", fd);
 }
