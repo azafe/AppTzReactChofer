@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -26,6 +26,7 @@ import {
   textareaCls,
 } from "../lib/formStyles";
 import { useDocSlot } from "../hooks/useDocSlot";
+import { buscarLugar } from "../lib/ocrMerge";
 import {
   emptyValues,
   useZafraViajeForm,
@@ -76,8 +77,10 @@ export function ZafraCargarPage() {
 
   const config = configQ.data?.config ?? DEFAULT_CONFIG;
   const unidades = unidadesQ.data?.unidades ?? [];
-  const lugares = lugaresQ.data?.lugares ?? [];
-  const frentes = frentesQ.data?.frentes ?? [];
+  // useMemo para que el ?? [] no devuelva un array nuevo en cada render y
+  // dispare de más el cálculo de la sugerencia de lugar.
+  const lugares = useMemo(() => lugaresQ.data?.lugares ?? [], [lugaresQ.data]);
+  const frentes = useMemo(() => frentesQ.data?.frentes ?? [], [frentesQ.data]);
 
   const form = useZafraViajeForm({
     initial: emptyValues("PARTICULARES", currentDriver?.vehicleId ?? ""),
@@ -149,6 +152,26 @@ export function ZafraCargarPage() {
       e.target.value = "";
     };
   }
+
+  // El remito trajo un origen que no se pudo resolver a un solo lugar: se lo
+  // mostramos al chofer en vez de descartarlo en silencio.
+  const sugerenciaLugar = useMemo(() => {
+    if (!values.lugarTextoOcr || values.lugarId) return null;
+    const r = buscarLugar(values.lugarTextoOcr, lugares);
+    return r.tipo === "varios"
+      ? { texto: values.lugarTextoOcr, candidatos: r.candidatos }
+      : { texto: values.lugarTextoOcr, candidatos: [] };
+  }, [values.lugarTextoOcr, values.lugarId, lugares]);
+
+  const crearLugarMut = useMutation({
+    mutationFn: (nombre: string) => createLugar({ nombre }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
+      form.selectLugar(res.lugar.id, res.lugar.nombre, res.lugar.kmQuePagaIngenio ?? null);
+      showToast("Lugar creado", "success");
+    },
+    onError: () => showToast("No se pudo crear el lugar", "error"),
+  });
 
   const auto = (field: OcrField) =>
     sources[field] && sources[field] !== "manual" ? ocrRing : "";
@@ -283,6 +306,54 @@ export function ZafraCargarPage() {
                   }
                 }}
               />
+
+              {sugerenciaLugar && (
+                <div className="mt-2 rounded-2xl border border-tz-yellow/30 bg-[rgba(240,199,95,0.06)] p-3">
+                  <p className="text-xs text-[var(--muted)]">El remito dice:</p>
+                  <p className="mt-0.5 text-sm font-medium text-[var(--text)] break-words">
+                    “{sugerenciaLugar.texto}”
+                  </p>
+
+                  {sugerenciaLugar.candidatos.length > 0 ? (
+                    <>
+                      <p className="mt-2 mb-1 text-xs text-[var(--muted)]">
+                        ¿Cuál de estos es?
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        {sugerenciaLugar.candidatos.map((l) => (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={() =>
+                              form.selectLugar(l.id, l.nombre, l.kmQuePagaIngenio ?? null)
+                            }
+                            className="flex items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs text-[var(--text)] hover:bg-white/10 transition-all"
+                          >
+                            <span className="break-words">{l.nombre}</span>
+                            <span className="shrink-0 text-[10px] text-[var(--muted)]">
+                              {l.kmQuePagaIngenio != null ? `${l.kmQuePagaIngenio} km` : "sin km"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 mb-1.5 text-xs text-[var(--muted)]">
+                        No está en la lista.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={crearLugarMut.isPending}
+                        onClick={() => crearLugarMut.mutate(sugerenciaLugar.texto)}
+                        className="h-9 w-full rounded-xl border border-tz-yellow/40 bg-tz-yellow/10 px-3 text-xs font-medium text-tz-yellow disabled:opacity-60"
+                      >
+                        {crearLugarMut.isPending ? "Creando..." : "+ Crear este lugar"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
