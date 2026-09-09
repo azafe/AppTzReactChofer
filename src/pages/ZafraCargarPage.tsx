@@ -158,9 +158,12 @@ export function ZafraCargarPage() {
   const sugerenciaLugar = useMemo(() => {
     if (!values.lugarTextoOcr || values.lugarId) return null;
     const r = buscarLugar(values.lugarTextoOcr, lugares);
-    return r.tipo === "varios"
-      ? { texto: values.lugarTextoOcr, candidatos: r.candidatos }
-      : { texto: values.lugarTextoOcr, candidatos: [] };
+    if (r.tipo === "unico") return null;
+    return {
+      texto: values.lugarTextoOcr,
+      candidatos: r.candidatos,
+      permitirCrear: r.permitirCrear,
+    };
   }, [values.lugarTextoOcr, values.lugarId, lugares]);
 
   const crearLugarMut = useMutation({
@@ -314,7 +317,7 @@ export function ZafraCargarPage() {
                     “{sugerenciaLugar.texto}”
                   </p>
 
-                  {sugerenciaLugar.candidatos.length > 0 ? (
+                  {sugerenciaLugar.candidatos.length > 0 && (
                     <>
                       <p className="mt-2 mb-1 text-xs text-[var(--muted)]">
                         ¿Cuál de estos es?
@@ -337,10 +340,14 @@ export function ZafraCargarPage() {
                         ))}
                       </div>
                     </>
-                  ) : (
+                  )}
+
+                  {sugerenciaLugar.permitirCrear && (
                     <>
                       <p className="mt-2 mb-1.5 text-xs text-[var(--muted)]">
-                        No está en la lista.
+                        {sugerenciaLugar.candidatos.length > 0
+                          ? "¿O es una finca nueva?"
+                          : "No está en la lista."}
                       </p>
                       <button
                         type="button"
