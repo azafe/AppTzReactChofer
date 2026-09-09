@@ -153,17 +153,16 @@ export function ZafraMisViajesPage() {
                 </p>
               )}
 
-              {/* Línea 4: km odómetro | km ingenio | gasoil */}
+              {/* Línea 4: km ingenio | gasoil */}
               <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--muted)]">
-                <span>
-                  Km: {v.kmSalida} → {v.kmLlegada}
-                  <span className="ml-1 text-[var(--text)]">({v.kmRecorridos} km)</span>
-                </span>
-                <span className="text-[var(--muted)]">|</span>
-                <span>
-                  Ing: <span className="text-[var(--text)]">{kmEfectivo} km</span>
-                </span>
-                <span className="text-[var(--muted)]">|</span>
+                {kmEfectivo != null && (
+                  <>
+                    <span>
+                      Ing: <span className="text-[var(--text)]">{kmEfectivo} km</span>
+                    </span>
+                    <span className="text-[var(--muted)]">|</span>
+                  </>
+                )}
                 <span>
                   Gasoil: <span className="text-[var(--text)]">{v.gasoil} L</span>
                 </span>

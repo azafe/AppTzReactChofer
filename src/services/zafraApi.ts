@@ -20,9 +20,10 @@ export type ZafraViaje = {
   kmSalida: number | null;
   kmLlegada: number | null;
   kmRecorridos: number | null;
-  kmIngenioFinca: number;
+  kmIngenioFinca: number | null;
   gasoil: number;
   pesoNetoKg?: number | null;
+  ingenioNombre?: string | null;
   observaciones?: string | null;
   fotoRemitoUrl?: string | null;
   fotoGasoilUrl?: string | null;
@@ -94,10 +95,14 @@ export type ZafraViajeBody = {
   lugarNombre?: string | null;
   frenteId?: string | null;
   frenteNumero?: string | null;
-  kmSalida: number | null;
-  kmLlegada: number | null;
+  // Opcionales a propósito: el chofer ya no carga odómetro y updateViaje escribe
+  // la columna con cualquier clave !== undefined, así que OMITIRLAS es lo que
+  // preserva los km que cargó el admin. Mandar null los borraría.
+  kmSalida?: number | null;
+  kmLlegada?: number | null;
   gasoil: number;
   pesoNetoKg?: number | null;
+  ingenioNombre?: string | null;
   observaciones?: string | null;
   fotoRemitoUrl?: string | null;
   fotoGasoilUrl?: string | null;
@@ -216,9 +221,16 @@ export async function listMisAmarillosDias(params: {
   return apiGet(`/registro-viajes/amarillos-dias?${q.toString()}`);
 }
 
+// El backend responde HTTP 200 con {ok:false} cuando el modelo no devuelve JSON
+// parseable, así que la falla de lectura NO llega como excepción: hay que
+// ramificar sobre `ok`.
+export type ZafraOcrResponse =
+  | { ok: true; data: ZafraOcrResult }
+  | { ok: false; error: string; raw?: string };
+
 export async function ocrZafraDocumento(
   url: string,
   tipo: "extracto_pesaje" | "orden_carga"
-): Promise<{ ok: boolean; data: ZafraOcrResult }> {
+): Promise<ZafraOcrResponse> {
   return apiPost("/registro-viajes/ocr", { url, tipo });
 }
