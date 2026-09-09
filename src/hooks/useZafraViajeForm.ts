@@ -26,6 +26,7 @@ export type ViajeFormValues = {
   lugarId: string;
   lugarNombre: string;
   lugarKmPagaIngenio: number | null;
+  lugarTextoOcr: string;
   frenteId: string;
   frenteNumero: string;
   gasoil: string;
@@ -83,6 +84,7 @@ function reducer(state: State, action: Action): State {
           lugarId: action.id,
           lugarNombre: action.label,
           lugarKmPagaIngenio: action.km,
+          lugarTextoOcr: "",
         },
         sources: { ...state.sources, lugar: "manual" },
       };
@@ -123,6 +125,7 @@ export function emptyValues(
     lugarId: "",
     lugarNombre: "",
     lugarKmPagaIngenio: null,
+    lugarTextoOcr: "",
     frenteId: "",
     frenteNumero: "",
     gasoil: "",
@@ -142,6 +145,7 @@ export function valuesFromViaje(v: ZafraViaje): ViajeFormValues {
     lugarId: v.lugarId ?? "",
     lugarNombre: v.lugarNombre ?? "",
     lugarKmPagaIngenio: v.kmPagaIngenioSnapshot ?? null,
+    lugarTextoOcr: "",
     frenteId: v.frenteId ?? "",
     frenteNumero: v.frenteNumero ?? "",
     gasoil: String(v.gasoil ?? ""),

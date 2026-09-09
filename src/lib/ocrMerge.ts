@@ -33,6 +33,8 @@ export type OcrValues = {
   lugarId: string;
   lugarNombre: string;
   lugarKmPagaIngenio: number | null;
+  /** Lo que leyó el OCR como origen, tal cual. Se muestra aunque no matchee. */
+  lugarTextoOcr: string;
   frenteId: string;
   frenteNumero: string;
   gasoil: string;
@@ -86,16 +88,75 @@ export function puedeEscribir(
   return GANADOR[field] === entrante;
 }
 
-/** Mismo criterio difuso que usaba applyOcrResult, ahora como función pura. */
-export function matchLugar(
-  nombre: string,
-  lugares: ZafraLugar[]
-): ZafraLugar | undefined {
-  const ocr = nombre.toLowerCase();
-  return lugares.find((l) => {
-    const n = l.nombre.toLowerCase();
-    return n.includes(ocr) || ocr.includes(n);
+/**
+ * Normaliza un nombre de lugar para comparar: sin acentos, sin el código del
+ * ingenio que va adelante, sin puntuación.
+ *
+ *   "25871-Arbol Solo - Marcos Jesús Gonzalo" → "arbol solo marcos jesus gonzalo"
+ *   "Árbol solo"                              → "arbol solo"
+ */
+export function normalizarLugar(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/^\s*\d+\s*-\s*/, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** El código del ingenio que precede al nombre, si lo trae. */
+export function codigoLugar(nombre: string): string | null {
+  const m = nombre.match(/^\s*(\d{3,})\s*-/);
+  return m ? m[1] : null;
+}
+
+export type MatchLugar =
+  /** Un solo candidato: se selecciona solo. */
+  | { tipo: "unico"; lugar: ZafraLugar }
+  /** Varios: NO se adivina, elige el chofer. */
+  | { tipo: "varios"; candidatos: ZafraLugar[] }
+  /** Ninguno: se ofrece crearlo con el texto del remito. */
+  | { tipo: "ninguno" };
+
+/**
+ * Busca el lugar del remito en la lista, de la señal más fuerte a la más débil.
+ * Nunca elige entre varios candidatos: un match errado es peor que ninguno,
+ * porque arrastra el km de otra finca a la comisión y nadie lo revisa.
+ */
+export function buscarLugar(nombre: string, lugares: ZafraLugar[]): MatchLugar {
+  const objetivo = normalizarLugar(nombre);
+  if (!objetivo) return { tipo: "ninguno" };
+
+  const decidir = (encontrados: ZafraLugar[]): MatchLugar | null => {
+    if (encontrados.length === 1) return { tipo: "unico", lugar: encontrados[0] };
+    if (encontrados.length > 1) return { tipo: "varios", candidatos: encontrados };
+    return null;
+  };
+
+  // 1) Igualdad exacta ya normalizada.
+  const exactos = lugares.filter((l) => normalizarLugar(l.nombre) === objetivo);
+  const porExacto = decidir(exactos);
+  if (porExacto) return porExacto;
+
+  // 2) Mismo código de ingenio: la clave más confiable que trae el documento.
+  const codigo = codigoLugar(nombre);
+  if (codigo) {
+    const porCodigo = decidir(lugares.filter((l) => codigoLugar(l.nombre) === codigo));
+    if (porCodigo) return porCodigo;
+  }
+
+  // 3) Uno contiene al otro. Se exige un mínimo de largo para que un nombre
+  //    corto como "Florida" no matchee media lista.
+  const contenidos = lugares.filter((l) => {
+    const n = normalizarLugar(l.nombre);
+    if (!n) return false;
+    const corto = n.length <= objetivo.length ? n : objetivo;
+    if (corto.length < 4) return false;
+    return n.includes(objetivo) || objetivo.includes(n);
   });
+  return decidir(contenidos) ?? { tipo: "ninguno" };
 }
 
 export function mergeOcr<V extends OcrValues>(
@@ -140,14 +201,17 @@ export function mergeOcr<V extends OcrValues>(
   }
 
   if (result.lugarNombre) {
-    const match = matchLugar(result.lugarNombre, lugares);
-    if (match) {
-      aplicar("lugar", () => {
-        values.lugarId = match.id;
-        values.lugarNombre = match.nombre;
-        values.lugarKmPagaIngenio = match.kmQuePagaIngenio ?? null;
-      });
-    }
+    // Se guarda siempre lo que dijo el remito, matchee o no: antes, si no
+    // matcheaba, el chofer no se enteraba de que el OCR sí había leído el origen.
+    aplicar("lugar", () => {
+      values.lugarTextoOcr = result.lugarNombre!;
+      const match = buscarLugar(result.lugarNombre!, lugares);
+      if (match.tipo === "unico") {
+        values.lugarId = match.lugar.id;
+        values.lugarNombre = match.lugar.nombre;
+        values.lugarKmPagaIngenio = match.lugar.kmQuePagaIngenio ?? null;
+      }
+    });
   }
 
   if (result.ingenioNombre) {
