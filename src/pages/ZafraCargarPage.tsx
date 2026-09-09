@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -9,60 +9,28 @@ import {
   getFrentes,
   getZafraConfig,
   getUnidadesActivas,
-  uploadZafraFoto,
-  ocrZafraDocumento,
-  listMisViajes,
-  tarifaAmarillosVigente,
-  type ZafraModalidad,
-  type ZafraConfig,
-  type ZafraOcrResult,
 } from "../services/zafraApi";
 import { ZafraNav } from "../components/ZafraNav";
 import { Card } from "../components/Card";
+import { Spinner } from "../components/Spinner";
 import { showToast } from "../components/Toast";
 import { CreatableCombobox } from "../components/CreatableCombobox";
-import { moneyARS, todayISO } from "../lib/format";
-
-const DEFAULT_CONFIG: ZafraConfig = {
-  particulares: {
-    tarifaBase: 1850,
-    tarifaPorKm: 92.5,
-    tarifaPorKmReducida: 46.25,
-    porcentajeComision: 0.15,
-  },
-  amarillos: {
-    gananciaDiariaOwner: 133333.33,
-    tarifaDiariaConductor: 56000,
-    tarifaPorViajeConductor: 12000,
-  },
-};
-
-function asNum(v: string) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
-}
-
-function calcParticulares(params: {
-  kmIngenioFinca: number;
-  kmPagaIngenio?: number | null;
-  pesoNetoKg: number;
-  tarifaBase: number;
-  tarifaPorKm: number;
-  porcentajeComision: number;
-}) {
-  const { kmIngenioFinca, kmPagaIngenio, pesoNetoKg, tarifaBase, tarifaPorKm, porcentajeComision } = params;
-  const kmParaFormula = kmPagaIngenio ?? kmIngenioFinca;
-  const valorUnitario = tarifaBase + tarifaPorKm * kmParaFormula;
-  const valorTotal = valorUnitario * (pesoNetoKg / 1000);
-  const comisionChofer = valorTotal * porcentajeComision;
-  return { valorUnitario, valorTotal, comisionChofer };
-}
-
-const inputCls =
-  "h-11 w-full rounded-2xl border border-white/15 bg-[#0f1115] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-tz-yellow/60";
-const readonlyCls =
-  "h-11 w-full cursor-not-allowed rounded-2xl border border-white/8 bg-white/5 px-3 flex items-center text-[var(--muted)] text-sm";
-const labelCls = "mb-1 block text-xs text-[var(--muted)]";
+import { moneyARS } from "../lib/format";
+import { DEFAULT_CONFIG } from "../lib/zafraCalc";
+import {
+  inputCls,
+  labelCls,
+  ocrRing,
+  primaryBtnCls,
+  readonlyCls,
+  textareaCls,
+} from "../lib/formStyles";
+import { useDocSlot } from "../hooks/useDocSlot";
+import {
+  emptyValues,
+  useZafraViajeForm,
+  type OcrField,
+} from "../hooks/useZafraViajeForm";
 
 function OcrBadge() {
   return (
@@ -76,36 +44,14 @@ export function ZafraCargarPage() {
   const { currentDriver } = useAuth();
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState<"docs" | "form">("docs");
-  const [modalidad, setModalidad] = useState<ZafraModalidad>("PARTICULARES");
-  const [fecha, setFecha] = useState(todayISO());
-  const [camionVehicleId, setCamionVehicleId] = useState(currentDriver?.vehicleId ?? "");
-  const [lugarId, setLugarId] = useState("");
-  const [lugarNombre, setLugarNombre] = useState("");
-  const [lugarKmPagaIngenio, setLugarKmPagaIngenio] = useState<number | null>(null);
-  const [frenteId, setFrenteId] = useState("");
-  const [frenteNumero, setFrenteNumero] = useState("");
-  const [kmSalida, setKmSalida] = useState("");
-  const [kmLlegada, setKmLlegada] = useState("");
-  const [gasoil, setGasoil] = useState("");
-  const [pesoNetoKg, setPesoNetoKg] = useState("");
-  const [ingenioNombre, setIngenioNombre] = useState("");
-  const [ordenCargaNumero, setOrdenCargaNumero] = useState("");
-  const [ordenRemitoNumero, setOrdenRemitoNumero] = useState("");
-  const [observaciones, setObservaciones] = useState("");
-  const [fotoRemitoUrl, setFotoRemitoUrl] = useState<string | null>(null);
-  const [fotoGasoilUrl, setFotoGasoilUrl] = useState<string | null>(null);
-  const [uploadingRemito, setUploadingRemito] = useState(false);
-  const [uploadingGasoil, setUploadingGasoil] = useState(false);
-  const [ocrLoadingRemito, setOcrLoadingRemito] = useState(false);
-  const [ocrLoadingOrden, setOcrLoadingOrden] = useState(false);
-  const [ocrFilledFields, setOcrFilledFields] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<string[]>([]);
+  const [mostrarVehiculo, setMostrarVehiculo] = useState(false);
+  const [mostrarObs, setMostrarObs] = useState(false);
 
-  const remitoInputRef = useRef<HTMLInputElement>(null);
-  const remitoGaleriaRef = useRef<HTMLInputElement>(null);
-  const gasoilInputRef = useRef<HTMLInputElement>(null);
-  const gasoilGaleriaRef = useRef<HTMLInputElement>(null);
+  const extractoCamRef = useRef<HTMLInputElement>(null);
+  const extractoGalRef = useRef<HTMLInputElement>(null);
+  const ordenCamRef = useRef<HTMLInputElement>(null);
+  const ordenGalRef = useRef<HTMLInputElement>(null);
 
   const configQ = useQuery({
     queryKey: ["zafra-config"],
@@ -128,225 +74,63 @@ export function ZafraCargarPage() {
     staleTime: 60_000,
   });
 
-  const lastViajeQ = useQuery({
-    queryKey: ["zafra-last-viaje", currentDriver?.vehicleId],
-    queryFn: async () => {
-      if (!currentDriver?.vehicleId) return null;
-      const res = await listMisViajes({ choferId: currentDriver.id, limit: 200 });
-      const viajes = res.viajes ?? [];
-      if (!viajes.length) return null;
-      viajes.sort((a, b) => {
-        if (a.fecha !== b.fecha) return a.fecha < b.fecha ? 1 : -1;
-        return a.id < b.id ? 1 : -1;
-      });
-      return viajes[0];
-    },
-    enabled: !!currentDriver,
-    staleTime: 30_000,
-  });
-
-  useState(() => {
-    const last = lastViajeQ.data;
-    if (last && !kmSalida) setKmSalida(String(last.kmLlegada));
-  });
-
   const config = configQ.data?.config ?? DEFAULT_CONFIG;
   const unidades = unidadesQ.data?.unidades ?? [];
-  const resolvedConfig = config.particulares;
+  const lugares = lugaresQ.data?.lugares ?? [];
+  const frentes = frentesQ.data?.frentes ?? [];
 
-  // Si el driver no tiene vehicleId propio, usar el primer camión disponible de la lista
-  const effectiveCamionVehicleId =
-    camionVehicleId || unidades[0]?.vehicleId || "";
+  const form = useZafraViajeForm({
+    initial: emptyValues("PARTICULARES", currentDriver?.vehicleId ?? ""),
+    config,
+    lugares,
+    frentes,
+  });
+  const { values, sources, set, montos } = form;
 
-  const selectedUnidad = unidades.find((u) => u.vehicleId === effectiveCamionVehicleId);
-  const requiereOdometro = selectedUnidad?.tieneOdometro !== false;
+  const extracto = useDocSlot("extracto", form.applyOcr);
+  const orden = useDocSlot("orden", form.applyOcr);
 
-  const kmSalidaN = asNum(kmSalida);
-  const kmLlegadaN = asNum(kmLlegada);
-  const kmRecorridos =
-    Number.isFinite(kmLlegadaN) && Number.isFinite(kmSalidaN)
-      ? Math.max(0, kmLlegadaN - kmSalidaN)
-      : 0;
-  const kmIngenioFinca = kmRecorridos / 2;
-  // Km efectivo para el cálculo: usa el del lugar si está configurado, sino km odómetro / 2
-  const kmEfectivo = lugarKmPagaIngenio ?? kmIngenioFinca;
+  const leyendo = extracto.slot.status === "reading" || orden.slot.status === "reading";
+  const subiendo = extracto.slot.status === "uploading" || orden.slot.status === "uploading";
 
-  const pesoN = asNum(pesoNetoKg);
-  const calcs = useMemo(() => {
-    if (modalidad !== "PARTICULARES" || !Number.isFinite(pesoN) || pesoN <= 0) return null;
-    return calcParticulares({
-      kmIngenioFinca: kmEfectivo,
-      pesoNetoKg: pesoN,
-      tarifaBase: resolvedConfig.tarifaBase,
-      tarifaPorKm: resolvedConfig.tarifaPorKm,
-      porcentajeComision: resolvedConfig.porcentajeComision,
-    });
-  }, [modalidad, kmEfectivo, pesoN, resolvedConfig]);
-
-  function clearOcr(field: string) {
-    setOcrFilledFields((prev) => {
-      const next = new Set(prev);
-      next.delete(field);
-      return next;
-    });
-  }
-
-  function applyOcrResult(result: ZafraOcrResult, source: "remito" | "gasoil") {
-    const newFilled = new Set<string>();
-
-    if (source === "remito" && result.pesoNetoKg !== undefined) {
-      setPesoNetoKg(String(result.pesoNetoKg));
-      newFilled.add("pesoNetoKg");
-    }
-    if (source === "gasoil" && result.gasoilLts !== undefined) {
-      setGasoil(String(result.gasoilLts));
-      newFilled.add("gasoil");
-    }
-
-    if (result.frenteNumero) {
-      const frentes = frentesQ.data?.frentes ?? [];
-      const match = frentes.find(
-        (f) => f.numero.toLowerCase() === result.frenteNumero!.toLowerCase()
-      );
-      if (match && !frenteId) {
-        setFrenteId(match.id);
-        setFrenteNumero(match.numero);
-        newFilled.add("frenteNumero");
-      }
-    }
-
-    if (result.lugarNombre) {
-      const lugares = lugaresQ.data?.lugares ?? [];
-      const ocrLower = result.lugarNombre.toLowerCase();
-      const match = lugares.find((l) => {
-        const nombreLower = l.nombre.toLowerCase();
-        return nombreLower.includes(ocrLower) || ocrLower.includes(nombreLower);
-      });
-      if (match && !lugarId) {
-        setLugarId(match.id);
-        setLugarNombre(match.nombre);
-        setLugarKmPagaIngenio(match.kmQuePagaIngenio ?? null);
-        newFilled.add("lugarNombre");
-      }
-    }
-
-    if (result.ingenioNombre && !ingenioNombre) {
-      setIngenioNombre(result.ingenioNombre);
-      newFilled.add("ingenioNombre");
-    }
-
-    if (source === "gasoil" && result.ordenCargaNumero) {
-      setOrdenCargaNumero(String(result.ordenCargaNumero));
-      newFilled.add("ordenCargaNumero");
-    }
-    if (source === "remito" && result.ordenRemitoNumero) {
-      setOrdenRemitoNumero(String(result.ordenRemitoNumero));
-      newFilled.add("ordenRemitoNumero");
-    }
-
-    if (result.fecha && fecha === todayISO()) {
-      const year = parseInt(result.fecha.slice(0, 4), 10);
-      if (year >= 2025 && year <= 2030) {
-        setFecha(result.fecha);
-        newFilled.add("fecha");
-      }
-    }
-
-    setOcrFilledFields((prev) => new Set([...prev, ...newFilled]));
-  }
-
-  const ocrBusy = ocrLoadingRemito || ocrLoadingOrden;
+  // El camión propio del chofer, o el primero disponible si no tiene asignado.
+  const camionId = values.camionVehicleId || unidades[0]?.vehicleId || "";
+  const camionNombre =
+    unidades.find((u) => u.vehicleId === camionId)?.vehicleLabel ??
+    currentDriver?.vehicleLabel ??
+    "";
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const errs: string[] = [];
-      if (requiereOdometro) {
-        if (!kmSalida) errs.push("KmSalida es obligatorio.");
-        if (!kmLlegada) errs.push("KmLlegada es obligatorio.");
-        const kmS = asNum(kmSalida);
-        const kmL = asNum(kmLlegada);
-        if (Number.isFinite(kmS) && Number.isFinite(kmL) && kmL <= kmS)
-          errs.push("KmLlegada debe ser mayor que KmSalida.");
-      }
-      if (modalidad === "PARTICULARES") {
-        const p = asNum(pesoNetoKg);
-        if (!Number.isFinite(p) || p <= 0) errs.push("PesoNetoKg debe ser mayor a 0 para Particulares.");
-      }
-      const gasoilN = asNum(gasoil);
-      if (!Number.isFinite(gasoilN) || gasoilN < 0) errs.push("Gasoil debe ser >= 0.");
+      const errs = form.validate();
       if (errs.length) throw Object.assign(new Error("validation"), { validationErrors: errs });
 
-      const camionNombre =
-        unidades.find((u) => u.vehicleId === effectiveCamionVehicleId)?.vehicleLabel ??
-        currentDriver!.vehicleLabel ??
-        "";
-
-      const body = {
-        modalidad,
-        fecha,
-        choferId: currentDriver!.id,
-        choferNombre: currentDriver!.name,
-        camionId: effectiveCamionVehicleId,
-        camionNombre,
-        lugarId: lugarId || null,
-        lugarNombre: lugarNombre || null,
-        frenteId: frenteId || null,
-        frenteNumero: frenteNumero || null,
-        kmSalida: requiereOdometro && kmSalida ? asNum(kmSalida) : null,
-        kmLlegada: requiereOdometro && kmLlegada ? asNum(kmLlegada) : null,
-        gasoil: gasoilN,
-        pesoNetoKg: modalidad === "PARTICULARES" ? pesoN : null,
-        ingenioNombre: ingenioNombre || null,
-        ordenCargaNumero: ordenCargaNumero.trim() || null,
-        ordenRemitoNumero: ordenRemitoNumero.trim() || null,
-        observaciones: observaciones.trim() || null,
-        fotoRemitoUrl: fotoRemitoUrl || null,
-        fotoGasoilUrl: fotoGasoilUrl || null,
-        kmPagaIngenioSnapshot: lugarKmPagaIngenio ?? undefined,
-        ...(calcs
-          ? {
-              valorUnitarioARS: calcs.valorUnitario,
-              valorTotalARS: calcs.valorTotal,
-              comisionChofer: calcs.comisionChofer,
-              tarifaBaseSnapshot: resolvedConfig.tarifaBase,
-              tarifaPorKmSnapshot: resolvedConfig.tarifaPorKm,
-              comisionPctSnapshot: resolvedConfig.porcentajeComision,
-              kmPagaIngenioSnapshot: lugarKmPagaIngenio ?? undefined,
-            }
-          : {}),
-        ...(modalidad === "AMARILLOS"
-          ? { comisionChofer: tarifaAmarillosVigente(config.amarillos, fecha).tarifaPorViajeConductor }
-          : {}),
-      };
-
-      return createZafraViaje(body);
+      return createZafraViaje(
+        form.buildCreateBody({
+          driverId: currentDriver!.id,
+          driverNombre: currentDriver!.name,
+          camionId,
+          camionNombre,
+          fotos: {
+            fotoRemitoUrl: extracto.slot.url,
+            fotoGasoilUrl: orden.slot.url,
+          },
+        })
+      );
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       showToast("Viaje guardado correctamente", "success");
-      setStep("docs");
-      setKmSalida(result.viaje.kmLlegada != null ? String(result.viaje.kmLlegada) : "");
-      setKmLlegada("");
-      setGasoil("");
-      setPesoNetoKg("");
-      setIngenioNombre("");
-      setOrdenCargaNumero("");
-      setOrdenRemitoNumero("");
-      setLugarKmPagaIngenio(null);
-      setObservaciones("");
-      setFotoRemitoUrl(null);
-      setFotoGasoilUrl(null);
-      setOcrFilledFields(new Set());
+      form.reset(emptyValues(values.modalidad, values.camionVehicleId));
+      extracto.clear();
+      orden.clear();
+      setMostrarObs(false);
       setErrors([]);
       queryClient.invalidateQueries({ queryKey: ["zafra"] });
-      queryClient.invalidateQueries({ queryKey: ["zafra-last-viaje"] });
     },
     onError: (err: unknown) => {
       const e = err as Error & { validationErrors?: string[] };
-      if (e.validationErrors) {
-        setErrors(e.validationErrors);
-      } else {
-        showToast(e.message ?? "Error al guardar", "error");
-      }
+      if (e.validationErrors) setErrors(e.validationErrors);
+      else showToast(e.message ?? "Error al guardar", "error");
     },
   });
 
@@ -356,346 +140,142 @@ export function ZafraCargarPage() {
     mutation.mutate();
   }
 
-  // ── Photo upload handlers (shared between steps) ───────────────────────────
-
-  async function handleRemitoFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingRemito(true);
-    try {
-      const res = await uploadZafraFoto(file, "remito");
-      setFotoRemitoUrl(res.url);
-      setOcrLoadingRemito(true);
-      try {
-        const ocr = await ocrZafraDocumento(res.url, "extracto_pesaje");
-        if (ocr.ok && ocr.data) {
-          applyOcrResult(ocr.data, "remito");
-          showToast("Datos del extracto detectados", "success");
-        }
-      } catch {
-        showToast("No se pudo leer el extracto automáticamente", "error");
-      } finally {
-        setOcrLoadingRemito(false);
-      }
-    } catch {
-      showToast("Error al subir foto del extracto", "error");
-    } finally {
-      setUploadingRemito(false);
+  function pick(slot: ReturnType<typeof useDocSlot>) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) slot.pick(file);
+      // No se limpia el input hasta que la subida sale bien: si falla, el File
+      // sigue en memoria y "Reintentar" no vuelve a abrir la cámara.
       e.target.value = "";
-    }
+    };
   }
 
-  async function handleGasoilFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingGasoil(true);
-    try {
-      const res = await uploadZafraFoto(file, "gasoil");
-      setFotoGasoilUrl(res.url);
-      setOcrLoadingOrden(true);
-      try {
-        const ocr = await ocrZafraDocumento(res.url, "orden_carga");
-        if (ocr.ok && ocr.data) {
-          applyOcrResult(ocr.data, "gasoil");
-          showToast("Datos de la orden detectados", "success");
-        }
-      } catch {
-        showToast("No se pudo leer la orden automáticamente", "error");
-      } finally {
-        setOcrLoadingOrden(false);
-      }
-    } catch {
-      showToast("Error al subir foto de la orden", "error");
-    } finally {
-      setUploadingGasoil(false);
-      e.target.value = "";
-    }
-  }
+  const auto = (field: OcrField) =>
+    sources[field] && sources[field] !== "manual" ? ocrRing : "";
+  const badge = (field: OcrField) =>
+    sources[field] && sources[field] !== "manual" ? <OcrBadge /> : null;
 
-  const remitoUploader = (
-    <>
-      <input ref={remitoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleRemitoFile} />
-      <input ref={remitoGaleriaRef} type="file" accept="image/*" className="hidden" onChange={handleRemitoFile} />
-    </>
-  );
+  return (
+    <div className="flex flex-col gap-5">
+      <ZafraNav />
 
-  const gasoilUploader = (
-    <>
-      <input ref={gasoilInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleGasoilFile} />
-      <input ref={gasoilGaleriaRef} type="file" accept="image/*" className="hidden" onChange={handleGasoilFile} />
-    </>
-  );
+      {/* iOS necesita inputs separados: con capture abre la cámara, sin capture el picker */}
+      <input ref={extractoCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={pick(extracto)} />
+      <input ref={extractoGalRef} type="file" accept="image/*" className="hidden" onChange={pick(extracto)} />
+      <input ref={ordenCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={pick(orden)} />
+      <input ref={ordenGalRef} type="file" accept="image/*" className="hidden" onChange={pick(orden)} />
 
-  // ── Step 1: Documentos ─────────────────────────────────────────────────────
-
-  if (step === "docs") {
-    return (
-      <div className="flex flex-col gap-6">
-        <ZafraNav />
-        {remitoUploader}
-        {gasoilUploader}
-
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        {/* ── Fotos ──────────────────────────────────────────────────────── */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Documentos del viaje
           </p>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">
-            Sacá foto a los documentos para completar el formulario automáticamente
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          {/* Extracto de Pesaje */}
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-[var(--text)]">Extracto de Pesaje</p>
-            {fotoRemitoUrl ? (
-              <img
-                src={fotoRemitoUrl}
-                alt="Extracto de pesaje"
-                className="h-44 w-full rounded-2xl object-cover border border-white/15"
-              />
-            ) : (
-              <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/15 bg-white/3">
-                <span className="text-3xl">⚖️</span>
-              </div>
-            )}
-            {(uploadingRemito || ocrLoadingRemito) ? (
-              <div className="h-11 flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm text-tz-yellow animate-pulse">
-                {ocrLoadingRemito ? "Leyendo..." : "Subiendo..."}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => remitoInputRef.current?.click()}
-                  className="h-11 rounded-2xl border border-white/20 bg-white/5 text-xs font-medium text-[var(--text)] hover:bg-white/10 transition-all">
-                  📷 Cámara
-                </button>
-                <button type="button" onClick={() => remitoGaleriaRef.current?.click()}
-                  className="h-11 rounded-2xl border border-white/20 bg-white/5 text-xs font-medium text-[var(--text)] hover:bg-white/10 transition-all">
-                  🖼️ Galería
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Orden de Carga */}
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-[var(--text)]">Orden de Carga</p>
-            {fotoGasoilUrl ? (
-              <img
-                src={fotoGasoilUrl}
-                alt="Orden de carga"
-                className="h-44 w-full rounded-2xl object-cover border border-white/15"
-              />
-            ) : (
-              <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/15 bg-white/3">
-                <span className="text-3xl">⛽</span>
-              </div>
-            )}
-            {(uploadingGasoil || ocrLoadingOrden) ? (
-              <div className="h-11 flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm text-tz-yellow animate-pulse">
-                {ocrLoadingOrden ? "Leyendo..." : "Subiendo..."}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => gasoilInputRef.current?.click()}
-                  className="h-11 rounded-2xl border border-white/20 bg-white/5 text-xs font-medium text-[var(--text)] hover:bg-white/10 transition-all">
-                  📷 Cámara
-                </button>
-                <button type="button" onClick={() => gasoilGaleriaRef.current?.click()}
-                  className="h-11 rounded-2xl border border-white/20 bg-white/5 text-xs font-medium text-[var(--text)] hover:bg-white/10 transition-all">
-                  🖼️ Galería
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {ocrBusy && (
-          <p className="text-center text-sm text-tz-yellow animate-pulse">
-            Detectando datos del documento...
-          </p>
-        )}
-
-        <button
-          type="button"
-          disabled={ocrBusy}
-          onClick={() => setStep("form")}
-          className="h-12 w-full rounded-xl bg-tz-yellow font-semibold text-tz-black hover:brightness-105 disabled:opacity-60 disabled:pointer-events-none transition-all"
-        >
-          {ocrBusy ? "Leyendo documentos..." : "Continuar →"}
-        </button>
-
-        {!fotoRemitoUrl && !fotoGasoilUrl && (
-          <button
-            type="button"
-            onClick={() => setStep("form")}
-            className="text-center text-xs text-[var(--muted)] underline underline-offset-2"
-          >
-            Continuar sin documentos
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // ── Step 2: Formulario ─────────────────────────────────────────────────────
-
-  return (
-    <div className="flex flex-col gap-6">
-      <ZafraNav />
-      {remitoUploader}
-      {gasoilUploader}
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-
-        {/* Fotos compactas */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setStep("docs")}
-            className="text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
-          >
-            ← Documentos
-          </button>
-          <div className="flex gap-2 ml-auto">
-            {fotoRemitoUrl ? (
-              <img src={fotoRemitoUrl} alt="Extracto" className="h-10 w-16 rounded-lg object-cover border border-white/15 cursor-pointer" onClick={() => remitoInputRef.current?.click()} />
-            ) : (
-              <button type="button" onClick={() => remitoInputRef.current?.click()} className="h-10 w-16 rounded-lg border border-dashed border-white/20 text-[10px] text-[var(--muted)] hover:bg-white/5 transition-all">
-                Extracto
-              </button>
-            )}
-            {fotoGasoilUrl ? (
-              <img src={fotoGasoilUrl} alt="Orden" className="h-10 w-16 rounded-lg object-cover border border-white/15 cursor-pointer" onClick={() => gasoilInputRef.current?.click()} />
-            ) : (
-              <button type="button" onClick={() => gasoilInputRef.current?.click()} className="h-10 w-16 rounded-lg border border-dashed border-white/20 text-[10px] text-[var(--muted)] hover:bg-white/5 transition-all">
-                Orden
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── Vehículo ─────────────────────────────────────────────── */}
-        <Card>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Vehículo
+          <p className="mt-0.5 mb-3 text-xs text-[var(--muted)]">
+            Sacá la foto y los datos se completan solos
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Modalidad</label>
-              <select
-                value={modalidad}
-                onChange={(e) => setModalidad(e.target.value as ZafraModalidad)}
-                className={inputCls}
-              >
-                <option value="PARTICULARES">Particulares</option>
-                <option value="AMARILLOS">Amarillos</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Camión</label>
-              {unidades.length > 0 ? (
-                <select
-                  value={effectiveCamionVehicleId}
-                  onChange={(e) => setCamionVehicleId(e.target.value)}
-                  className={inputCls}
-                >
-                  {unidades.map((u) => (
-                    <option key={u.vehicleId} value={u.vehicleId}>{u.vehicleLabel}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
-              )}
-            </div>
+            <FotoSlot
+              slot={extracto}
+              titulo="Extracto de Pesaje"
+              emoji="⚖️"
+              obligatorio
+              camRef={extractoCamRef}
+              galRef={extractoGalRef}
+            />
+            <FotoSlot
+              slot={orden}
+              titulo="Orden de Carga"
+              emoji="⛽"
+              obligatorio={false}
+              camRef={ordenCamRef}
+              galRef={ordenGalRef}
+            />
           </div>
-          <div className="mt-3">
-            <label className={labelCls}>Chofer</label>
-            <div className={readonlyCls}>{currentDriver?.name ?? ""}</div>
-          </div>
-        </Card>
+        </div>
 
-        {/* ── Odómetro ─────────────────────────────────────────────── */}
-        <Card>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Odómetro
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Km Salida {requiereOdometro ? "*" : "(opcional)"}</label>
-              <input
-                type="number"
-                value={kmSalida}
-                onChange={(e) => setKmSalida(e.target.value)}
-                placeholder="0"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Km Llegada {requiereOdometro ? "*" : "(opcional)"}</label>
-              <input
-                type="number"
-                value={kmLlegada}
-                onChange={(e) => setKmLlegada(e.target.value)}
-                placeholder="0"
-                className={inputCls}
-              />
-            </div>
-          </div>
-          {kmRecorridos > 0 && (
-            <p className="mt-2 text-xs text-[var(--muted)]">
-              Km recorridos: <span className="font-semibold text-[var(--text)]">{kmRecorridos}</span>
-              {" "} · Km ingenio/finca: <span className="font-semibold text-[var(--text)]">{kmIngenioFinca}</span>
-              {lugarKmPagaIngenio != null && (
-                <span className="ml-2 text-tz-yellow font-semibold">
-                  · Km paga ingenio: {lugarKmPagaIngenio}
-                </span>
-              )}
-            </p>
+        {/* ── Estado de lectura ──────────────────────────────────────────── */}
+        <div aria-live="polite">
+          {leyendo && (
+            <Card className="border-tz-yellow/30 bg-[rgba(240,199,95,0.06)]">
+              <div className="flex items-center gap-3">
+                <Spinner className="h-5 w-5" />
+                <p className="text-base font-semibold text-tz-yellow">
+                  Leyendo la información de la foto...
+                </p>
+              </div>
+            </Card>
           )}
-        </Card>
+          {!leyendo && subiendo && (
+            <Card>
+              <div className="flex items-center gap-3">
+                <Spinner className="h-5 w-5" />
+                <p className="text-sm text-[var(--muted)]">Subiendo foto...</p>
+              </div>
+            </Card>
+          )}
 
-        {/* ── Extracto de Pesaje ───────────────────────────────────── */}
+          {extracto.slot.status === "upload_error" && (
+            <ErrorSubida titulo="extracto de pesaje" onRetry={extracto.retryUpload} />
+          )}
+          {orden.slot.status === "upload_error" && (
+            <ErrorSubida titulo="orden de carga" onRetry={orden.retryUpload} />
+          )}
+          {extracto.slot.status === "ocr_failed" && (
+            <ErrorLectura
+              titulo="extracto de pesaje"
+              onRetry={extracto.retryOcr}
+              onDismiss={extracto.dismissOcrError}
+            />
+          )}
+          {orden.slot.status === "ocr_failed" && (
+            <ErrorLectura
+              titulo="orden de carga"
+              onRetry={orden.retryOcr}
+              onDismiss={orden.dismissOcrError}
+            />
+          )}
+        </div>
+
+        {/* ── Datos a verificar ──────────────────────────────────────────── */}
         <Card>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            ⚖️ Extracto de Pesaje
+            Verificá los datos
           </p>
+
           <div className="flex flex-col gap-3">
             <div>
               <label className={labelCls}>
                 Fecha
-                {ocrFilledFields.has("fecha") && <OcrBadge />}
+                {badge("fecha")}
               </label>
               <input
                 type="date"
-                value={fecha}
-                onChange={(e) => { setFecha(e.target.value); clearOcr("fecha"); }}
-                className={`${inputCls} ${ocrFilledFields.has("fecha") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                value={values.fecha}
+                onChange={(e) => set("fecha", e.target.value)}
+                className={`${inputCls} ${auto("fecha")}`}
               />
             </div>
 
             <div>
               <label className={labelCls}>
                 Lugar (origen)
-                {ocrFilledFields.has("lugarNombre") && <OcrBadge />}
+                {badge("lugar")}
               </label>
               <CreatableCombobox
-                items={(lugaresQ.data?.lugares ?? []).map((l) => ({ id: l.id, label: l.nombre }))}
-                value={lugarId}
+                items={lugares.map((l) => ({ id: l.id, label: l.nombre }))}
+                value={values.lugarId}
                 isLoading={lugaresQ.isLoading}
-                className={`${inputCls} ${ocrFilledFields.has("lugarNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                placeholder="Buscá el lugar de carga..."
+                className={`${inputCls} ${auto("lugar")}`}
                 onSelect={(id, label) => {
-                  setLugarId(id);
-                  setLugarNombre(label);
-                  if (id) clearOcr("lugarNombre");
-                  const lugar = (lugaresQ.data?.lugares ?? []).find((l) => l.id === id);
-                  setLugarKmPagaIngenio(lugar?.kmQuePagaIngenio ?? null);
+                  const lugar = lugares.find((l) => l.id === id);
+                  form.selectLugar(id, label, lugar?.kmQuePagaIngenio ?? null);
                 }}
                 onCreate={async (text) => {
                   try {
                     const res = await createLugar({ nombre: text });
                     queryClient.invalidateQueries({ queryKey: ["zafra-lugares"] });
-                    setLugarKmPagaIngenio(null);
                     return { id: res.lugar.id, label: res.lugar.nombre };
                   } catch {
                     showToast("Error al crear el lugar", "error");
@@ -708,14 +288,16 @@ export function ZafraCargarPage() {
             <div>
               <label className={labelCls}>
                 Frente
-                {ocrFilledFields.has("frenteNumero") && <OcrBadge />}
+                {badge("frente")}
               </label>
               <CreatableCombobox
-                items={(frentesQ.data?.frentes ?? []).map((f) => ({ id: f.id, label: f.numero }))}
-                value={frenteId}
+                items={frentes.map((f) => ({ id: f.id, label: f.numero }))}
+                value={values.frenteId}
                 isLoading={frentesQ.isLoading}
-                className={`${inputCls} ${ocrFilledFields.has("frenteNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-                onSelect={(id, label) => { setFrenteId(id); setFrenteNumero(label); if (id) clearOcr("frenteNumero"); }}
+                placeholder="Buscá el frente..."
+
+                className={`${inputCls} ${auto("frente")}`}
+                onSelect={(id, label) => form.selectFrente(id, label)}
                 onCreate={async (text) => {
                   try {
                     const res = await createFrente({ numero: text });
@@ -729,117 +311,188 @@ export function ZafraCargarPage() {
               />
             </div>
 
-            {modalidad === "PARTICULARES" && (
+            {values.modalidad === "PARTICULARES" && (
               <div>
                 <label className={labelCls}>
                   Peso Neto (Kg) *
-                  {ocrFilledFields.has("pesoNetoKg") && <OcrBadge />}
+                  {badge("pesoNetoKg")}
                 </label>
                 <input
                   type="number"
                   min="0"
                   step="1"
-                  value={pesoNetoKg}
-                  onChange={(e) => { setPesoNetoKg(e.target.value); clearOcr("pesoNetoKg"); }}
+                  inputMode="numeric"
+                  value={values.pesoNetoKg}
+                  onChange={(e) => set("pesoNetoKg", e.target.value)}
                   placeholder="0"
-                  className={`${inputCls} ${ocrFilledFields.has("pesoNetoKg") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                  className={`${inputCls} ${auto("pesoNetoKg")}`}
                 />
               </div>
             )}
 
-            <div>
-              <label className={labelCls}>
-                N° Orden (del extracto)
-                {ocrFilledFields.has("ordenRemitoNumero") && <OcrBadge />}
-              </label>
-              <input
-                type="text"
-                value={ordenRemitoNumero}
-                onChange={(e) => { setOrdenRemitoNumero(e.target.value); clearOcr("ordenRemitoNumero"); }}
-                placeholder="ej. 216266"
-                className={`${inputCls} ${ocrFilledFields.has("ordenRemitoNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-              />
-            </div>
-          </div>
-        </Card>
-
-        {/* ── Orden de Carga ────────────────────────────────────────── */}
-        <Card>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            ⛽ Orden de Carga
-          </p>
-          <div className="flex flex-col gap-3">
-            <div>
-              <label className={labelCls}>
-                N° Orden (de la orden)
-                {ocrFilledFields.has("ordenCargaNumero") && <OcrBadge />}
-              </label>
-              <input
-                type="text"
-                value={ordenCargaNumero}
-                onChange={(e) => { setOrdenCargaNumero(e.target.value); clearOcr("ordenCargaNumero"); }}
-                placeholder="ej. 216266"
-                className={`${inputCls} ${ocrFilledFields.has("ordenCargaNumero") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>
+                  N° Orden (extracto)
+                  {badge("ordenRemitoNumero")}
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={values.ordenRemitoNumero}
+                  onChange={(e) => set("ordenRemitoNumero", e.target.value)}
+                  placeholder="ej. 216266"
+                  className={`${inputCls} ${auto("ordenRemitoNumero")}`}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  N° Orden de carga
+                  {badge("ordenCargaNumero")}
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={values.ordenCargaNumero}
+                  onChange={(e) => set("ordenCargaNumero", e.target.value)}
+                  placeholder="ej. 216266"
+                  className={`${inputCls} ${auto("ordenCargaNumero")}`}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>
                   Gasoil (L)
-                  {ocrFilledFields.has("gasoil") && <OcrBadge />}
+                  {badge("gasoil")}
                 </label>
                 <input
                   type="number"
                   min="0"
                   step="0.1"
-                  value={gasoil}
-                  onChange={(e) => { setGasoil(e.target.value); clearOcr("gasoil"); }}
+                  inputMode="decimal"
+                  value={values.gasoil}
+                  onChange={(e) => set("gasoil", e.target.value)}
                   placeholder="0"
-                  className={`${inputCls} ${ocrFilledFields.has("gasoil") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                  className={`${inputCls} ${auto("gasoil")}`}
                 />
               </div>
               <div>
                 <label className={labelCls}>
                   Ingenio (destino)
-                  {ocrFilledFields.has("ingenioNombre") && <OcrBadge />}
+                  {badge("ingenioNombre")}
                 </label>
                 <input
                   type="text"
-                  value={ingenioNombre}
-                  onChange={(e) => { setIngenioNombre(e.target.value); clearOcr("ingenioNombre"); }}
+                  value={values.ingenioNombre}
+                  onChange={(e) => set("ingenioNombre", e.target.value)}
                   placeholder="Ej: Cruz Alta"
-                  className={`${inputCls} ${ocrFilledFields.has("ingenioNombre") ? "ring-2 ring-tz-yellow/40 border-tz-yellow/30" : ""}`}
+                  className={`${inputCls} ${auto("ingenioNombre")}`}
                 />
               </div>
             </div>
           </div>
+
+          {/* Vehículo: casi nunca cambia, va colapsado */}
+          <div className="mt-4 border-t border-white/8 pt-3">
+            {!mostrarVehiculo ? (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-[var(--muted)] capitalize truncate">
+                  {values.modalidad.toLowerCase()} · {camionNombre || "—"} ·{" "}
+                  {currentDriver?.name ?? ""}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMostrarVehiculo(true)}
+                  className="shrink-0 text-xs text-tz-yellow underline underline-offset-2"
+                >
+                  Cambiar
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Modalidad</label>
+                  <select
+                    value={values.modalidad}
+                    onChange={(e) => set("modalidad", e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="PARTICULARES">Particulares</option>
+                    <option value="AMARILLOS">Amarillos</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Camión</label>
+                  {unidades.length > 0 ? (
+                    <select
+                      value={camionId}
+                      onChange={(e) => set("camionVehicleId", e.target.value)}
+                      className={inputCls}
+                    >
+                      {unidades.map((u) => (
+                        <option key={u.vehicleId} value={u.vehicleId}>
+                          {u.vehicleLabel}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className={readonlyCls}>{currentDriver?.vehicleLabel ?? "—"}</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Observaciones: se usan en 1 de cada 5 viajes */}
+          <div className="mt-3">
+            {!mostrarObs ? (
+              <button
+                type="button"
+                onClick={() => setMostrarObs(true)}
+                className="text-xs text-[var(--muted)] underline underline-offset-2"
+              >
+                + Agregar observación
+              </button>
+            ) : (
+              <>
+                <label className={labelCls}>Observaciones</label>
+                <textarea
+                  value={values.observaciones}
+                  onChange={(e) => set("observaciones", e.target.value)}
+                  rows={3}
+                  placeholder="Opcional..."
+                  className={textareaCls}
+                />
+              </>
+            )}
+          </div>
         </Card>
 
-        {/* ── Comisión estimada ─────────────────────────────────────── */}
-        {modalidad === "PARTICULARES" && calcs && (
-          <Card className="border-tz-yellow/20 bg-[rgba(240,199,95,0.04)]">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-tz-yellow">
-              Tu comisión estimada
-            </p>
+        {/* ── Comisión ───────────────────────────────────────────────────── */}
+        <Card className="border-tz-yellow/20 bg-[rgba(240,199,95,0.04)]">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-tz-yellow">
+            Tu comisión estimada
+          </p>
+          {montos.comisionChofer != null ? (
             <p className="font-display text-3xl font-bold text-tz-yellow">
-              {moneyARS(calcs.comisionChofer)}
+              {moneyARS(montos.comisionChofer)}
             </p>
-          </Card>
-        )}
-
-        {/* ── Observaciones ─────────────────────────────────────────── */}
-        <Card>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Observaciones
-          </label>
-          <textarea
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            rows={3}
-            placeholder="Opcional..."
-            className="w-full rounded-2xl border border-white/15 bg-[#0f1115] px-3 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-tz-yellow/60 resize-none"
-          />
+          ) : (
+            <>
+              <p className="text-base font-semibold text-[var(--muted)]">
+                Comisión a confirmar por oficina
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {montos.motivoSinMonto === "sin_km_lugar"
+                  ? values.lugarNombre
+                    ? `Faltan configurar los km de "${values.lugarNombre}".`
+                    : "Elegí el lugar de origen para calcular la comisión."
+                  : "Cargá el peso neto para calcular la comisión."}
+              </p>
+            </>
+          )}
         </Card>
 
         {errors.length > 0 && (
@@ -852,14 +505,151 @@ export function ZafraCargarPage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="h-12 w-full rounded-xl bg-tz-yellow font-semibold text-tz-black hover:brightness-105 disabled:opacity-60 disabled:pointer-events-none transition-all"
-        >
+        {!extracto.slot.url && (
+          <p className="text-center text-xs text-[var(--muted)]">
+            Podés guardar sin la foto del extracto, pero conviene adjuntarla.
+          </p>
+        )}
+
+        <button type="submit" disabled={mutation.isPending} className={primaryBtnCls}>
           {mutation.isPending ? "Guardando..." : "Guardar viaje"}
         </button>
       </form>
     </div>
+  );
+}
+
+function FotoSlot({
+  slot,
+  titulo,
+  emoji,
+  obligatorio,
+  camRef,
+  galRef,
+}: {
+  slot: ReturnType<typeof useDocSlot>;
+  titulo: string;
+  emoji: string;
+  obligatorio: boolean;
+  camRef: React.RefObject<HTMLInputElement | null>;
+  galRef: React.RefObject<HTMLInputElement | null>;
+}) {
+  const { status, previewUrl } = slot.slot;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-[var(--text)]">
+          {titulo}
+          {obligatorio ? <span className="text-tz-yellow"> *</span> : (
+            <span className="text-[var(--muted)]"> (opcional)</span>
+          )}
+        </p>
+        {previewUrl && (
+          <button
+            type="button"
+            onClick={slot.clear}
+            className="text-xs text-[var(--muted)] hover:text-[var(--text)] leading-none px-1"
+            aria-label={`Quitar ${titulo}`}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className="relative">
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={titulo}
+            className="h-36 w-full rounded-2xl object-cover border border-white/15"
+          />
+        ) : (
+          <div className="flex h-36 items-center justify-center rounded-2xl border-2 border-dashed border-white/15 bg-white/3">
+            <span className="text-3xl">{emoji}</span>
+          </div>
+        )}
+        {slot.busy && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-black/60">
+            <Spinner className="h-6 w-6" />
+            <span className="text-[11px] font-medium text-tz-yellow">
+              {status === "uploading" ? "Subiendo..." : "Leyendo..."}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={slot.busy}
+          onClick={() => camRef.current?.click()}
+          className="h-11 rounded-2xl border border-white/20 bg-white/5 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 transition-all"
+        >
+          📷 Cámara
+        </button>
+        <button
+          type="button"
+          disabled={slot.busy}
+          onClick={() => galRef.current?.click()}
+          className="h-11 rounded-2xl border border-white/20 bg-white/5 text-xs font-medium text-[var(--text)] hover:bg-white/10 disabled:opacity-50 transition-all"
+        >
+          🖼️ Galería
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Avisos ──────────────────────────────────────────────────────────────────
+
+function ErrorSubida({ titulo, onRetry }: { titulo: string; onRetry: () => void }) {
+  return (
+    <Card className="border-tz-red/30 bg-tz-red/10">
+      <p className="text-sm text-tz-red">No se pudo subir la foto del {titulo}.</p>
+      <p className="mt-0.5 text-xs text-[var(--muted)]">
+        No perdiste nada de lo que cargaste.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-2 h-9 rounded-xl border border-tz-red/40 bg-tz-red/10 px-4 text-xs font-medium text-tz-red"
+      >
+        Reintentar
+      </button>
+    </Card>
+  );
+}
+
+function ErrorLectura({
+  titulo,
+  onRetry,
+  onDismiss,
+}: {
+  titulo: string;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <Card className="border-tz-yellow/30 bg-[rgba(240,199,95,0.06)]">
+      <p className="text-sm text-[var(--text)]">
+        No se pudo leer el {titulo}. La foto se guardó igual.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="h-9 rounded-xl border border-tz-yellow/40 bg-tz-yellow/10 px-4 text-xs font-medium text-tz-yellow"
+        >
+          Reintentar lectura
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="h-9 rounded-xl border border-white/15 px-4 text-xs font-medium text-[var(--muted)]"
+        >
+          Completar a mano
+        </button>
+      </div>
+    </Card>
   );
 }

@@ -12,54 +12,18 @@ import {
   createFrente,
   type ZafraViaje,
   type ZafraModalidad,
-  type ZafraConfig,
 } from "../services/zafraApi";
 import { showToast } from "./Toast";
 import { Card } from "./Card";
 import { CreatableCombobox } from "./CreatableCombobox";
 import { moneyARS, dateAR } from "../lib/format";
-
-// ─── Helpers (same as ZafraCargarPage) ───────────────────────────────────────
-
-const DEFAULT_CONFIG: ZafraConfig = {
-  particulares: {
-    tarifaBase: 1850,
-    tarifaPorKm: 92.5,
-    tarifaPorKmReducida: 46.25,
-    porcentajeComision: 0.15,
-  },
-  amarillos: {
-    gananciaDiariaOwner: 133333.33,
-    tarifaDiariaConductor: 56000,
-    tarifaPorViajeConductor: 12000,
-  },
-};
-
-function asNum(v: string) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
-}
-
-function calcParticulares(params: {
-  kmIngenioFinca: number;
-  kmPagaIngenio?: number | null;
-  pesoNetoKg: number;
-  tarifaBase: number;
-  tarifaPorKm: number;
-  porcentajeComision: number;
-}) {
-  const { kmIngenioFinca, kmPagaIngenio, pesoNetoKg, tarifaBase, tarifaPorKm, porcentajeComision } =
-    params;
-  const kmParaFormula = kmPagaIngenio ?? kmIngenioFinca;
-  const valorUnitario = tarifaBase + tarifaPorKm * kmParaFormula;
-  const valorTotal = valorUnitario * (pesoNetoKg / 1000);
-  const comisionChofer = valorTotal * porcentajeComision;
-  return { valorUnitario, valorTotal, comisionChofer };
-}
-
-const inputCls =
-  "h-11 w-full rounded-2xl border border-white/15 bg-[#0f1115] px-3 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-tz-yellow/60";
-const labelCls = "mb-1 block text-xs text-[var(--muted)]";
+import {
+  DEFAULT_CONFIG,
+  asNum,
+  calcMontosParticulares,
+  comisionAmarillos,
+} from "../lib/zafraCalc";
+import { inputCls, labelCls, textareaCls } from "../lib/formStyles";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -87,11 +51,10 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
   );
   const [frenteId, setFrenteId] = useState(viaje.frenteId ?? "");
   const [frenteNumero, setFrenteNumero] = useState(viaje.frenteNumero ?? "");
-  const [kmSalida, setKmSalida] = useState(viaje.kmSalida != null ? String(viaje.kmSalida) : "");
-  const [kmLlegada, setKmLlegada] = useState(
-    viaje.kmLlegada != null ? String(viaje.kmLlegada) : ""
-  );
   const [gasoil, setGasoil] = useState(String(viaje.gasoil));
+  const [ingenioNombre, setIngenioNombre] = useState(viaje.ingenioNombre ?? "");
+  const [ordenCargaNumero, setOrdenCargaNumero] = useState(viaje.ordenCargaNumero ?? "");
+  const [ordenRemitoNumero, setOrdenRemitoNumero] = useState(viaje.ordenRemitoNumero ?? "");
   const [pesoNetoKg, setPesoNetoKg] = useState(
     viaje.pesoNetoKg != null ? String(viaje.pesoNetoKg) : ""
   );
@@ -133,30 +96,20 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
   const unidades = unidadesQ.data?.unidades ?? [];
   const resolvedConfig = config.particulares;
 
-  const selectedUnidad = unidades.find((u) => u.vehicleId === camionVehicleId);
-  const requiereOdometro = selectedUnidad?.tieneOdometro !== false;
-
-  // ── Commission calculation ────────────────────────────────────────────────
-  const kmSalidaN = asNum(kmSalida);
-  const kmLlegadaN = asNum(kmLlegada);
-  const kmRecorridos =
-    Number.isFinite(kmLlegadaN) && Number.isFinite(kmSalidaN)
-      ? Math.max(0, kmLlegadaN - kmSalidaN)
-      : 0;
-  const kmIngenioFinca = kmRecorridos / 2;
-  const kmEfectivo = lugarKmPagaIngenio ?? kmIngenioFinca;
+  // ── Comisión: el km del lugar es la única fuente, ya no hay odómetro ──────
   const pesoN = asNum(pesoNetoKg);
 
-  const calcs = useMemo(() => {
-    if (modalidad !== "PARTICULARES" || !Number.isFinite(pesoN) || pesoN <= 0) return null;
-    return calcParticulares({
-      kmIngenioFinca: kmEfectivo,
-      pesoNetoKg: pesoN,
-      tarifaBase: resolvedConfig.tarifaBase,
-      tarifaPorKm: resolvedConfig.tarifaPorKm,
-      porcentajeComision: resolvedConfig.porcentajeComision,
-    });
-  }, [modalidad, kmEfectivo, pesoN, resolvedConfig]);
+  const montos = useMemo(
+    () =>
+      calcMontosParticulares({
+        kmPagaIngenio: lugarKmPagaIngenio,
+        pesoNetoKg: Number.isFinite(pesoN) ? pesoN : null,
+        tarifaBase: resolvedConfig.tarifaBase,
+        tarifaPorKm: resolvedConfig.tarifaPorKm,
+        porcentajeComision: resolvedConfig.porcentajeComision,
+      }),
+    [lugarKmPagaIngenio, pesoN, resolvedConfig]
+  );
 
   // ── Photo upload handlers ─────────────────────────────────────────────────
   async function handleRemitoFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -195,14 +148,6 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
   const editMutation = useMutation({
     mutationFn: async () => {
       const errs: string[] = [];
-      if (requiereOdometro) {
-        if (!kmSalida) errs.push("KmSalida es obligatorio.");
-        if (!kmLlegada) errs.push("KmLlegada es obligatorio.");
-        const kmS = asNum(kmSalida);
-        const kmL = asNum(kmLlegada);
-        if (Number.isFinite(kmS) && Number.isFinite(kmL) && kmL <= kmS)
-          errs.push("KmLlegada debe ser mayor que KmSalida.");
-      }
       if (modalidad === "PARTICULARES") {
         const p = asNum(pesoNetoKg);
         if (!Number.isFinite(p) || p <= 0) errs.push("PesoNetoKg debe ser mayor a 0 para Particulares.");
@@ -224,27 +169,35 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
         lugarNombre: lugarNombre || null,
         frenteId: frenteId || null,
         frenteNumero: frenteNumero || null,
-        kmSalida: requiereOdometro && kmSalida ? asNum(kmSalida) : null,
-        kmLlegada: requiereOdometro && kmLlegada ? asNum(kmLlegada) : null,
+        // kmSalida/kmLlegada se OMITEN a propósito: updateViaje escribe la
+        // columna con cualquier clave !== undefined, así que mandarlas en null
+        // borraría los km que cargó el admin (y km_recorridos, que es generada).
         gasoil: gasoilN,
         pesoNetoKg: modalidad === "PARTICULARES" ? pesoN : null,
+        ingenioNombre: ingenioNombre.trim() || null,
+        ordenCargaNumero: ordenCargaNumero.trim() || null,
+        ordenRemitoNumero: ordenRemitoNumero.trim() || null,
         observaciones: observaciones.trim() || null,
         fotoRemitoUrl: fotoRemitoUrl || null,
         fotoGasoilUrl: fotoGasoilUrl || null,
-        kmPagaIngenioSnapshot: lugarKmPagaIngenio ?? undefined,
-        ...(calcs
+        // Al revés que el alta, los montos van SIEMPRE explícitos (incluido
+        // null) para que un viaje cuyo lugar quedó sin km limpie el monto viejo.
+        ...(modalidad === "AMARILLOS"
           ? {
-              valorUnitarioARS: calcs.valorUnitario,
-              valorTotalARS: calcs.valorTotal,
-              comisionChofer: calcs.comisionChofer,
+              valorUnitarioARS: null,
+              valorTotalARS: null,
+              comisionChofer: comisionAmarillos(config.amarillos, fecha),
+              kmPagaIngenioSnapshot: null,
+            }
+          : {
+              valorUnitarioARS: montos.valorUnitarioARS,
+              valorTotalARS: montos.valorTotalARS,
+              comisionChofer: montos.comisionChofer,
               tarifaBaseSnapshot: resolvedConfig.tarifaBase,
               tarifaPorKmSnapshot: resolvedConfig.tarifaPorKm,
               comisionPctSnapshot: resolvedConfig.porcentajeComision,
-            }
-          : {}),
-        ...(modalidad === "AMARILLOS"
-          ? { comisionChofer: config.amarillos.tarifaPorViajeConductor }
-          : {}),
+              kmPagaIngenioSnapshot: lugarKmPagaIngenio,
+            }),
       };
 
       return updateZafraViaje(viaje.id, body);
@@ -362,19 +315,18 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
               )}
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-[var(--muted)]">Odómetro</p>
-                  <p className="text-[var(--text)]">
-                    {viaje.kmSalida} → {viaje.kmLlegada}
-                    {viaje.kmRecorridos != null && (
-                      <span className="ml-1 text-xs text-[var(--muted)]">({viaje.kmRecorridos} km)</span>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-[var(--muted)]">Km ingenio</p>
-                  <p className="text-[var(--text)]">{kmEfectivoView} km</p>
-                </div>
+                {kmEfectivoView != null && (
+                  <div>
+                    <p className="text-xs text-[var(--muted)]">Km ingenio</p>
+                    <p className="text-[var(--text)]">{kmEfectivoView} km</p>
+                  </div>
+                )}
+                {viaje.ingenioNombre && (
+                  <div>
+                    <p className="text-xs text-[var(--muted)]">Ingenio</p>
+                    <p className="text-[var(--text)]">{viaje.ingenioNombre}</p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -584,46 +536,6 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
                 </div>
               </Card>
 
-              {/* Odómetro */}
-              <Card>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-                  Odómetro
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>Km Salida {requiereOdometro ? "*" : "(opcional)"}</label>
-                    <input
-                      type="number"
-                      value={kmSalida}
-                      onChange={(e) => setKmSalida(e.target.value)}
-                      placeholder="0"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Km Llegada {requiereOdometro ? "*" : "(opcional)"}</label>
-                    <input
-                      type="number"
-                      value={kmLlegada}
-                      onChange={(e) => setKmLlegada(e.target.value)}
-                      placeholder="0"
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-                {kmRecorridos > 0 && (
-                  <p className="mt-2 text-xs text-[var(--muted)]">
-                    Km recorridos: <span className="font-semibold text-[var(--text)]">{kmRecorridos}</span>
-                    {" "}· Km ingenio/finca: <span className="font-semibold text-[var(--text)]">{kmIngenioFinca}</span>
-                    {lugarKmPagaIngenio != null && (
-                      <span className="ml-2 text-tz-yellow font-semibold">
-                        · Km paga ingenio: {lugarKmPagaIngenio}
-                      </span>
-                    )}
-                  </p>
-                )}
-              </Card>
-
               {/* Datos del viaje */}
               <Card>
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -704,6 +616,42 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
+                      <label className={labelCls}>N° Orden (extracto)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={ordenRemitoNumero}
+                        onChange={(e) => setOrdenRemitoNumero(e.target.value)}
+                        placeholder="ej. 216266"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>N° Orden de carga</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={ordenCargaNumero}
+                        onChange={(e) => setOrdenCargaNumero(e.target.value)}
+                        placeholder="ej. 216266"
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Ingenio (destino)</label>
+                    <input
+                      type="text"
+                      value={ingenioNombre}
+                      onChange={(e) => setIngenioNombre(e.target.value)}
+                      placeholder="Ej: Cruz Alta"
+                      className={inputCls}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <label className={labelCls}>Gasoil (L)</label>
                       <input
                         type="number"
@@ -753,14 +701,29 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
               </Card>
 
               {/* Comisión estimada */}
-              {modalidad === "PARTICULARES" && calcs && (
+              {modalidad === "PARTICULARES" && (
                 <Card className="border-tz-yellow/20 bg-[rgba(240,199,95,0.04)]">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-tz-yellow">
                     Tu comisión estimada
                   </p>
-                  <p className="font-display text-3xl font-bold text-tz-yellow">
-                    {moneyARS(calcs.comisionChofer)}
-                  </p>
+                  {montos.comisionChofer != null ? (
+                    <p className="font-display text-3xl font-bold text-tz-yellow">
+                      {moneyARS(montos.comisionChofer)}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-base font-semibold text-[var(--muted)]">
+                        Comisión a confirmar por oficina
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--muted)]">
+                        {montos.motivoSinMonto === "sin_km_lugar"
+                          ? lugarNombre
+                            ? `Faltan configurar los km de "${lugarNombre}".`
+                            : "Elegí el lugar de origen para calcular la comisión."
+                          : "Cargá el peso neto para calcular la comisión."}
+                      </p>
+                    </>
+                  )}
                 </Card>
               )}
 
@@ -774,7 +737,7 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
                   onChange={(e) => setObservaciones(e.target.value)}
                   rows={3}
                   placeholder="Opcional..."
-                  className="w-full rounded-2xl border border-white/15 bg-[#0f1115] px-3 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-tz-yellow/60 resize-none"
+                  className={textareaCls}
                 />
               </Card>
 
