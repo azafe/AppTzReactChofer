@@ -115,48 +115,66 @@ export function codigoLugar(nombre: string): string | null {
 export type MatchLugar =
   /** Un solo candidato: se selecciona solo. */
   | { tipo: "unico"; lugar: ZafraLugar }
-  /** Varios: NO se adivina, elige el chofer. */
-  | { tipo: "varios"; candidatos: ZafraLugar[] }
-  /** Ninguno: se ofrece crearlo con el texto del remito. */
-  | { tipo: "ninguno" };
+  /**
+   * Ninguno o varios: decide el chofer. `permitirCrear` va en true cuando el
+   * remito trae un código que no está en la lista, así puede darlo de alta con
+   * el nombre canónico del ingenio.
+   */
+  | { tipo: "elegir"; candidatos: ZafraLugar[]; permitirCrear: boolean };
+
+const elegir = (candidatos: ZafraLugar[], permitirCrear: boolean): MatchLugar => ({
+  tipo: "elegir",
+  candidatos,
+  permitirCrear,
+});
+
+const resolver = (encontrados: ZafraLugar[]): MatchLugar | null =>
+  encontrados.length === 1 ? { tipo: "unico", lugar: encontrados[0] }
+  : encontrados.length > 1 ? elegir(encontrados, false)
+  : null;
 
 /**
- * Busca el lugar del remito en la lista, de la señal más fuerte a la más débil.
- * Nunca elige entre varios candidatos: un match errado es peor que ninguno,
- * porque arrastra el km de otra finca a la comisión y nadie lo revisa.
+ * Busca el lugar del remito en la lista.
+ *
+ * Si el documento trae código, el código MANDA y no se cae al nombre: "Las
+ * Cejas" son cinco fincas distintas con distancias de 41 a 51 km, así que
+ * matchear por texto asigna la equivocada y arrastra el km de otra finca a la
+ * comisión. Cuando el código no está en la lista se ofrece crearlo, mostrando
+ * además los lugares sin código que se parezcan, que pueden ser esa misma finca
+ * cargada antes a mano.
+ *
+ * Sin código —OCR degradado o documento viejo— se compara por nombre.
  */
 export function buscarLugar(nombre: string, lugares: ZafraLugar[]): MatchLugar {
   const objetivo = normalizarLugar(nombre);
-  if (!objetivo) return { tipo: "ninguno" };
+  if (!objetivo) return elegir([], false);
 
-  const decidir = (encontrados: ZafraLugar[]): MatchLugar | null => {
-    if (encontrados.length === 1) return { tipo: "unico", lugar: encontrados[0] };
-    if (encontrados.length > 1) return { tipo: "varios", candidatos: encontrados };
-    return null;
-  };
-
-  // 1) Igualdad exacta ya normalizada.
-  const exactos = lugares.filter((l) => normalizarLugar(l.nombre) === objetivo);
-  const porExacto = decidir(exactos);
-  if (porExacto) return porExacto;
-
-  // 2) Mismo código de ingenio: la clave más confiable que trae el documento.
   const codigo = codigoLugar(nombre);
   if (codigo) {
-    const porCodigo = decidir(lugares.filter((l) => codigoLugar(l.nombre) === codigo));
+    const porCodigo = resolver(lugares.filter((l) => codigoLugar(l.nombre) === codigo));
     if (porCodigo) return porCodigo;
+    // El código es nuevo. Un lugar con OTRO código es otra finca; uno sin código
+    // puede ser esta misma finca cargada a mano antes de canonizar el catálogo.
+    const sinCodigo = lugares.filter((l) => codigoLugar(l.nombre) == null);
+    return elegir(porNombre(objetivo, sinCodigo), true);
   }
 
-  // 3) Uno contiene al otro. Se exige un mínimo de largo para que un nombre
-  //    corto como "Florida" no matchee media lista.
-  const contenidos = lugares.filter((l) => {
+  const exactos = resolver(lugares.filter((l) => normalizarLugar(l.nombre) === objetivo));
+  if (exactos) return exactos;
+
+  const contenidos = resolver(porNombre(objetivo, lugares));
+  return contenidos ?? elegir([], true);
+}
+
+/** Uno contiene al otro, con un mínimo de largo para que "Florida" no matchee media lista. */
+function porNombre(objetivo: string, lugares: ZafraLugar[]): ZafraLugar[] {
+  return lugares.filter((l) => {
     const n = normalizarLugar(l.nombre);
     if (!n) return false;
     const corto = n.length <= objetivo.length ? n : objetivo;
     if (corto.length < 4) return false;
     return n.includes(objetivo) || objetivo.includes(n);
   });
-  return decidir(contenidos) ?? { tipo: "ninguno" };
 }
 
 export function mergeOcr<V extends OcrValues>(
