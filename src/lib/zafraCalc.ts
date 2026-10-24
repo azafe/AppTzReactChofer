@@ -17,6 +17,10 @@ export const DEFAULT_CONFIG: ZafraConfig = {
   },
 };
 
+// Tope de litros de gasoil por viaje (el backend valida lo mismo). Ningún viaje
+// real pasó de ~150 L: arriba de esto suele ser el peso neto tipeado en gasoil.
+export const GASOIL_MAX_LITROS = 400;
+
 export function asNum(v: string) {
   const n = Number(v);
   return Number.isFinite(n) ? n : NaN;

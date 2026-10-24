@@ -9,6 +9,7 @@ import {
   type ZafraViajeBody,
 } from "../services/zafraApi";
 import {
+  GASOIL_MAX_LITROS,
   asNum,
   calcMontosParticulares,
   comisionAmarillos,
@@ -236,6 +237,8 @@ export function useZafraViajeForm({ initial, config, lugares, frentes }: Options
     if (values.gasoil.trim() !== "") {
       const g = asNum(values.gasoil);
       if (!Number.isFinite(g) || g < 0) errs.push("El gasoil no puede ser negativo.");
+      else if (g > GASOIL_MAX_LITROS)
+        errs.push(`El gasoil no puede superar ${GASOIL_MAX_LITROS} L. ¿Pusiste el peso neto en ese campo?`);
     }
     return errs;
   }, [values.modalidad, values.pesoNetoKg, values.gasoil]);

@@ -19,6 +19,7 @@ import { CreatableCombobox } from "./CreatableCombobox";
 import { moneyARS, dateAR } from "../lib/format";
 import {
   DEFAULT_CONFIG,
+  GASOIL_MAX_LITROS,
   asNum,
   calcMontosParticulares,
   comisionAmarillos,
@@ -154,6 +155,7 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
       }
       const gasoilN = asNum(gasoil);
       if (!Number.isFinite(gasoilN) || gasoilN < 0) errs.push("Gasoil debe ser >= 0.");
+      else if (gasoilN > GASOIL_MAX_LITROS) errs.push(`Gasoil no puede superar ${GASOIL_MAX_LITROS} L. ¿Es el peso neto?`);
       if (errs.length) throw Object.assign(new Error("validation"), { validationErrors: errs });
 
       const camionNombre =
