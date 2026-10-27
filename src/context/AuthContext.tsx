@@ -12,7 +12,7 @@ import { apiGet } from "../lib/http";
 
 type AuthContextValue = {
   currentDriver: DriverAccount | null;
-  /** Motivo por el que se cerró la sesión sola (chofer inactivo o dado de baja). */
+  /** Motivo por el que se cerró la sesión sola (chofer inactivo, bloqueado o dado de baja). */
   sessionMessage: string | null;
   login: (username: string, pin: string) => Promise<LoginResult>;
   logout: () => void;
@@ -24,8 +24,9 @@ const STORAGE_KEY = "tz_chofer_session";
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
 const BAD_CREDENTIALS = "Usuario o PIN incorrecto.";
 
-// Cada cuánto se revalida el estado del chofer contra el backend.
-const REVALIDATE_MS = 5 * 60 * 1000;
+// Cada cuánto se revalida el estado del chofer contra el backend. Corto para
+// que un bloqueo de acceso desde el admin le cierre la sesión enseguida.
+const REVALIDATE_MS = 60 * 1000;
 // Piso entre revalidaciones, para no disparar una por cada foco de ventana.
 const REVALIDATE_THROTTLE_MS = 15 * 1000;
 
@@ -86,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        // 403 = chofer inactivo; el resto se muestra como credenciales inválidas
+        // 403 = chofer inactivo o con acceso bloqueado; el resto se muestra como credenciales inválidas
         if (res.status === 403 && data?.error) return { ok: false, error: String(data.error) };
         return { ok: false, error: BAD_CREDENTIALS };
       }
