@@ -7,6 +7,8 @@ export type ZafraModalidad = "PARTICULARES" | "AMARILLOS";
 
 export type ZafraViaje = {
   id: string;
+  numeroViajeMes?: number | null;
+  mesViaje?: string | null;
   modalidad: ZafraModalidad;
   fecha: string;
   choferId: string;

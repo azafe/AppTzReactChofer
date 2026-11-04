@@ -112,7 +112,7 @@ export function ZafraMisViajesPage() {
       )}
 
       <div className="flex flex-col gap-3">
-        {viajes.map((v, idx) => {
+        {viajes.map((v) => {
           const kmEfectivo = v.kmPagaIngenioSnapshot ?? v.kmIngenioFinca;
           return (
             <div key={v.id} onClick={() => setSelectedViaje(v)} className="cursor-pointer">
@@ -120,8 +120,9 @@ export function ZafraMisViajesPage() {
               {/* Línea 1: # fecha | comisión */}
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-[var(--text)]">
-                  <span className="text-tz-yellow font-bold mr-1">#{viajes.length - idx}</span>
+                  <span className="text-tz-yellow font-bold mr-1">#{v.numeroViajeMes ?? "—"}</span>
                   {dateAR(v.fecha)}
+                  {v.mesViaje && <span className="block text-xs font-normal text-[var(--muted)]">{v.modalidad === "AMARILLOS" ? "Amarillos" : "Particulares"} · {v.mesViaje}</span>}
                 </p>
                 <div className="text-right shrink-0">
                   {v.comisionChofer != null ? (
