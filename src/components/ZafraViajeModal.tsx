@@ -261,8 +261,9 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
             {/* Header */}
             <div className="mb-5 flex items-center justify-between">
               <p className="font-semibold text-[var(--text)]">
-                <span className="text-tz-yellow font-bold mr-1">Viaje</span>
+                <span className="text-tz-yellow font-bold mr-1">Viaje{viaje.numeroViajeMes != null ? ` #${viaje.numeroViajeMes}` : ""}</span>
                 {dateAR(viaje.fecha)}
+                {viaje.mesViaje && <span className="block text-xs font-normal text-[var(--muted)]">{viaje.modalidad === "AMARILLOS" ? "Amarillos" : "Particulares"} · {viaje.mesViaje}</span>}
               </p>
               <button
                 type="button"
