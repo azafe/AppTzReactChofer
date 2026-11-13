@@ -50,6 +50,8 @@ export type ZafraAmarillosTarifa = {
   gananciaDiariaOwner: number;
   tarifaDiariaConductor: number;
   tarifaPorViajeConductor: number;
+  /** Viaje que descarga en Ingenio Aguilares. Si falta, vale lo mismo que un viaje común. */
+  tarifaPorViajeAguilaresConductor?: number;
 };
 
 export type ZafraConfig = {
@@ -70,20 +72,37 @@ export type ZafraConfig = {
 export function tarifaAmarillosVigente(
   amarillos: ZafraConfig["amarillos"] | undefined,
   fecha: string
-): ZafraAmarillosTarifa {
+): Required<ZafraAmarillosTarifa> {
+  const conAguilares = (t: ZafraAmarillosTarifa): Required<ZafraAmarillosTarifa> => ({
+    gananciaDiariaOwner: t.gananciaDiariaOwner,
+    tarifaDiariaConductor: t.tarifaDiariaConductor,
+    tarifaPorViajeConductor: t.tarifaPorViajeConductor,
+    tarifaPorViajeAguilaresConductor: t.tarifaPorViajeAguilaresConductor ?? t.tarifaPorViajeConductor,
+  });
   const base = {
     gananciaDiariaOwner: amarillos?.gananciaDiariaOwner ?? 0,
     tarifaDiariaConductor: amarillos?.tarifaDiariaConductor ?? 0,
     tarifaPorViajeConductor: amarillos?.tarifaPorViajeConductor ?? 0,
+    tarifaPorViajeAguilaresConductor: amarillos?.tarifaPorViajeAguilaresConductor,
   };
   const vigencias = amarillos?.vigencias ?? [];
-  if (vigencias.length === 0 || !fecha) return base;
+  if (vigencias.length === 0 || !fecha) return conAguilares(base);
   const sorted = [...vigencias].sort((a, b) => a.desde.localeCompare(b.desde));
   let match = null;
   for (const v of sorted) {
     if (v.desde <= fecha) match = v;
   }
-  return match ?? sorted[0];
+  return conAguilares(match ?? sorted[0]);
+}
+
+/** Lo que cobra el chofer por un viaje de Amarillos, según la fecha y el ingenio de descarga. */
+export function tarifaViajeAmarillos(
+  amarillos: ZafraConfig["amarillos"] | undefined,
+  fecha: string,
+  ingenioNombre?: string | null
+): number {
+  const t = tarifaAmarillosVigente(amarillos, fecha);
+  return /aguilares/i.test(ingenioNombre ?? "") ? t.tarifaPorViajeAguilaresConductor : t.tarifaPorViajeConductor;
 }
 
 export type ZafraViajeBody = {

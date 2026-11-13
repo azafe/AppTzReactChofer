@@ -1,5 +1,5 @@
 import {
-  tarifaAmarillosVigente,
+  tarifaViajeAmarillos,
   type ZafraConfig,
 } from "../services/zafraApi";
 
@@ -80,10 +80,11 @@ export function calcMontosParticulares(p: {
   return { valorUnitarioARS, valorTotalARS, comisionChofer, motivoSinMonto: null };
 }
 
-/** Comisión de un viaje de AMARILLOS: tarifa por viaje vigente a esa fecha. */
+/** Comisión de un viaje de AMARILLOS: tarifa por viaje vigente a esa fecha (los de Aguilares tienen la suya). */
 export function comisionAmarillos(
   amarillos: ZafraConfig["amarillos"] | undefined,
-  fecha: string
+  fecha: string,
+  ingenioNombre?: string | null
 ): number {
-  return tarifaAmarillosVigente(amarillos, fecha).tarifaPorViajeConductor;
+  return tarifaViajeAmarillos(amarillos, fecha, ingenioNombre);
 }
