@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
-import { listMisViajes, getZafraConfig, listMisAmarillosDias, type ZafraViaje } from "../services/zafraApi";
+import { listMisViajes, getZafraConfig, listMisAmarillosDias, tarifaViajeAmarillos, type ZafraViaje } from "../services/zafraApi";
 import { ZafraNav } from "../components/ZafraNav";
 import { StatCard, Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
@@ -55,9 +55,13 @@ export function ZafraMisViajesPage() {
 
   const tarifaDiaria = configQ.data?.config?.amarillos.tarifaDiariaConductor ?? 0;
   const tarifaPorViaje = configQ.data?.config?.amarillos.tarifaPorViajeConductor ?? 0;
+  // Cada viaje con la tarifa de su fecha e ingenio (los de Aguilares se pagan aparte).
+  const amarillosCfg = configQ.data?.config?.amarillos;
 
   const totalDias = diasTrabajados * tarifaDiaria;
-  const totalViajes = cantidadViajes * tarifaPorViaje;
+  const totalViajes = amarillosCfg
+    ? amarillos.reduce((sum, v) => sum + tarifaViajeAmarillos(amarillosCfg, v.fecha, v.ingenioNombre), 0)
+    : cantidadViajes * tarifaPorViaje;
 
   const totalParticulares = particulares.reduce((sum, v) => sum + (v.comisionChofer ?? 0), 0);
 

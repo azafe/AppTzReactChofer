@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { getSheets, getAnticipos } from "../services/picadoApi";
 import { listMisViajesLimones } from "../services/limonesApi";
-import { listMisViajes, getZafraConfig, listMisAmarillosDias, tarifaAmarillosVigente } from "../services/zafraApi";
+import { listMisViajes, getZafraConfig, listMisAmarillosDias, tarifaAmarillosVigente, tarifaViajeAmarillos } from "../services/zafraApi";
 import { Card, SectionTitle } from "../components/Card";
 import { MonthPicker } from "../components/MonthPicker";
 import { PageSpinner, ErrorCard } from "../components/Spinner";
@@ -127,7 +127,7 @@ export function MiPagoPage() {
   const totalAmarillosDias = diasTrabajadosList.reduce(
     (s, d) => s + tarifaAmarillosVigente(amarillosCfg, d.fecha).tarifaDiariaConductor * (d.porcentaje ?? 1), 0);
   const totalAmarillosViajes = amarillosViajes.reduce(
-    (s, v) => s + tarifaAmarillosVigente(amarillosCfg, v.fecha).tarifaPorViajeConductor, 0);
+    (s, v) => s + tarifaViajeAmarillos(amarillosCfg, v.fecha, v.ingenioNombre), 0);
   const amarillosIngresos = totalAmarillosDias + totalAmarillosViajes;
 
   // ─── Zafra Particulares ───────────────────────────────────────────────────────

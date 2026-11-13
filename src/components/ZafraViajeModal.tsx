@@ -188,7 +188,7 @@ export function ZafraViajeModal({ viaje, onClose, onUpdated, onDeleted }: Props)
           ? {
               valorUnitarioARS: null,
               valorTotalARS: null,
-              comisionChofer: comisionAmarillos(config.amarillos, fecha),
+              comisionChofer: comisionAmarillos(config.amarillos, fecha, ingenioNombre),
               kmPagaIngenioSnapshot: null,
             }
           : {

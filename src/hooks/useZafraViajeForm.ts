@@ -213,7 +213,7 @@ export function useZafraViajeForm({ initial, config, lugares, frentes }: Options
       return {
         valorUnitarioARS: null,
         valorTotalARS: null,
-        comisionChofer: comisionAmarillos(config.amarillos, values.fecha),
+        comisionChofer: comisionAmarillos(config.amarillos, values.fecha, values.ingenioNombre),
         motivoSinMonto: null,
       };
     }
@@ -225,7 +225,7 @@ export function useZafraViajeForm({ initial, config, lugares, frentes }: Options
       tarifaPorKm: config.particulares.tarifaPorKm,
       porcentajeComision: config.particulares.porcentajeComision,
     });
-  }, [values.modalidad, values.fecha, values.lugarKmPagaIngenio, values.pesoNetoKg, config]);
+  }, [values.modalidad, values.fecha, values.ingenioNombre, values.lugarKmPagaIngenio, values.pesoNetoKg, config]);
 
   const validate = useCallback((): string[] => {
     const errs: string[] = [];
